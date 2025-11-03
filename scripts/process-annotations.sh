@@ -1,2 +1,2 @@
 #!/bin/bash
-python assets/annotation_pickle.py
+python helpers/annotation_pickle.py

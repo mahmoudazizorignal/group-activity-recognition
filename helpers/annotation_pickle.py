@@ -19,7 +19,7 @@ class Player:
         self.activity = activity
 
 
-def load_group_annotations(group_annotation_path: str, target_frames: dict = dict(), unique_player_activities: set = set()):
+def load_group_annotations(group_annotation_path: str, target_frames: dict = dict()):
 
     with open(group_annotation_path, "r", encoding="utf-8") as file:
         
@@ -29,12 +29,11 @@ def load_group_annotations(group_annotation_path: str, target_frames: dict = dic
             target_frame, group_activity = info[:2]
             target_frame = target_frame.replace(".jpg", "")
             target_frames[target_frame] = group_activity
-            unique_player_activities = unique_player_activities.union([info[i * 5 + 6] for i in range(12) if i*5 + 6 < len(info)])
     
-    return target_frames, unique_player_activities
+    return target_frames
 
 
-def load_tracking_annotation(tracking_annotation_path):
+def load_tracking_annotation(tracking_annotation_path: str):
 
     players = [[] for player in range(12)]
     with open(tracking_annotation_path, "r", encoding="utf-8") as file:
@@ -65,7 +64,6 @@ def load_annotations(tracking_annotation_path: str, volleyball_annotation_path: 
     
     target_frames = {}
     annotations = {}
-    unique_player_activities = set()
     for dirpath, dirnames, _ in os.walk(volleyball_annotation_path):
 
         if dirnames:
@@ -76,10 +74,9 @@ def load_annotations(tracking_annotation_path: str, volleyball_annotation_path: 
 
             print(f"processing group annotations of video number {dirpath.split("/")[-1]} .....")
 
-            target_frames, unique_player_activities = load_group_annotations(
+            target_frames = load_group_annotations(
                 group_annotation_path=group_annotation_path, 
                 target_frames=target_frames,
-                unique_player_activities=unique_player_activities,
             )
 
             continue
@@ -98,7 +95,7 @@ def load_annotations(tracking_annotation_path: str, volleyball_annotation_path: 
             "players": load_tracking_annotation(os.path.join(tracking_annotation_path, video_no, clip_no, f"{clip_no}.txt")),
         }
                 
-    return target_frames, unique_player_activities, annotations
+    return annotations
 
 
 if __name__ == "__main__":
@@ -107,31 +104,14 @@ if __name__ == "__main__":
     
     start = time()
 
-    target_frames, unique_player_activities, annotations = load_annotations(
+    annotations = load_annotations(
         tracking_annotation_path=tracking_annotation_path, 
         volleyball_annotation_path=volleyball_annotation_path
     )
 
-    group_activities = sorted(set(target_frames.values()))
-    player_activities = sorted(unique_player_activities)
-
-    group_activity_to_id = {
-        activity: i
-        for i, activity in enumerate(group_activities)
-    }
-
-    player_activity_to_id = {
-        activity: i
-        for i, activity in enumerate(player_activities)
-    }
-
     with open(os.path.join(base_path, "annotations.pkl"), "wb") as file:
         pickle.dump(
-            obj=[
-                group_activity_to_id,
-                player_activity_to_id,
-                annotations,
-            ],
+            obj=annotations,
             file=file
         )
 

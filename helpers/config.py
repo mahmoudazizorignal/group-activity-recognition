@@ -3,6 +3,15 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     TRAIN_VIDEOS: list
     VALIDATION_VIDEOS: list
+    TEST_VIDEOS: list
+    
+    CNT_BEFORE_TARGET: int
+    CNT_AFTER_TARGET: int
+
+    GROUP_ACTION_CNT: int
+    GROUP_ACTION_TO_ID: dict[str, int]
+    PLAYER_ACTION_CNT: int
+    PLAYER_ACTION_TO_ID: dict[str, int]
 
     class Config:
         env_file = ".env"
