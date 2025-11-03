@@ -1,2 +1,4 @@
 kaggle==1.7.4.5
 pydantic-settings==2.11.0
+torch==2.8.0+cu128
+torchvision==0.23.0+cu128
