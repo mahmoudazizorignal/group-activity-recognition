@@ -62,7 +62,7 @@ def load_tracking_annotation(tracking_annotation_path):
 
 
 def load_annotations(tracking_annotation_path: str, volleyball_annotation_path: str):
-
+    
     target_frames = {}
     annotations = {}
     unique_player_activities = set()
