@@ -1,6 +1,11 @@
+import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    BASE_PATH: str = os.path.dirname(os.path.dirname(__file__))
+    ANNOTATION_PATH: str
+    DATASET_PATH: str
+
     TRAIN_VIDEOS: list
     VALIDATION_VIDEOS: list
     TEST_VIDEOS: list
