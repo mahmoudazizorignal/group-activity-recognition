@@ -18,6 +18,21 @@ class Settings(BaseSettings):
     PLAYER_ACTION_CNT: int
     PLAYER_ACTION_TO_ID: dict[str, int]
 
+    DEVICE: str
+    MATMUL_PRECISION: str
+    SEED: int
+    TOTAL_BATCH: int
+    MINI_BATCH: int
+    GRAD_ACCUM_STEPS: int
+    PIN_MEMORY: int
+    NUM_WORKERS_TRAIN: int
+    NUM_WORKERS_EVAL: int
+    MAX_LR: float
+    MIN_LR: float
+    WARMUP_STEPS: float
+    MAX_STEPS: int
+    EVAL_STEPS: int
+
     class Config:
         env_file = ".env"
 
