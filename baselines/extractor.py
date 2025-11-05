@@ -8,8 +8,8 @@ from torchvision.transforms import v2
 def get_processor():
 
     return v2.Compose([
-        v2.Resize(size=232, interpolation=v2.InterpolationMode.BILINEAR),
-        v2.CenterCrop(size=224),
+        v2.Resize(size=(256, 256), interpolation=v2.InterpolationMode.BILINEAR),
+        v2.CenterCrop(size=(224, 224)),
         v2.ToDtype(dtype=torch.float32, scale=True),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
