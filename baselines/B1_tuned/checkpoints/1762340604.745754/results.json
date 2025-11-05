@@ -1,0 +1,17 @@
+{
+    "device": "cuda",
+    "seed": 13,
+    "n_classes": 8,
+    "total_batch_size": 256,
+    "batch_size": 32,
+    "grad_accum_steps": 8,
+    "pin_memory": true,
+    "num_workers_1": 4,
+    "num_workers_2": 8,
+    "max_lr": 0.0009,
+    "min_lr": 0.00018,
+    "warmup_steps": 3,
+    "max_steps": 40,
+    "eval_steps": 5,
+    "train_loss": 0.11739696562290192,
+    "train_accuracy":

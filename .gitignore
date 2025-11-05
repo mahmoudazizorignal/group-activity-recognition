@@ -225,3 +225,7 @@ dataset/
 .cursor-server
 .vscode-server
 .windsurf-server
+
+# models checkpoints
+*.pt
+*.pth

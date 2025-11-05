@@ -1,0 +1,22 @@
+{
+    "device": "cuda",
+    "seed": 13,
+    "n_classes": 8,
+    "total_batch_size": 256,
+    "batch_size": 32,
+    "grad_accum_steps": 8,
+    "pin_memory": true,
+    "num_workers_1": 4,
+    "num_workers_2": 8,
+    "max_lr": 0.001,
+    "min_lr": 0.0004,
+    "warmup_steps": 2,
+    "max_steps": 40,
+    "eval_steps": 5,
+    "train_loss": 0.1586587131023407,
+    "train_accuracy": 0.9499999955296516,
+    "train_f1": 0.9526056945323944,
+    "val_loss": 1.0980877053169977,
+    "eval_accuracy": 0.7016907845224652,
+    "eval_f1": 0.699969137708346
+}
