@@ -3,8 +3,9 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     BASE_PATH: str = os.path.dirname(os.path.dirname(__file__))
-    ANNOTATION_PATH: str
+    TRACKING_ANNOTATION: str
     DATASET_PATH: str
+    ANNOTATION_PATH: str
 
     TRAIN_VIDEOS: list
     VALIDATION_VIDEOS: list
