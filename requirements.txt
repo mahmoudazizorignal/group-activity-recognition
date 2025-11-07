@@ -4,3 +4,4 @@ torch==2.8.0+cu128
 torchvision==0.23.0+cu128
 torchmetrics==1.7.4
 tqdm==4.67.1
+tensorboard==2.15.1
