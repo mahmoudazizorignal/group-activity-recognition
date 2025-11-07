@@ -22,17 +22,20 @@ class Settings(BaseSettings):
     DEVICE: str
     MATMUL_PRECISION: str
     SEED: int
-    TOTAL_BATCH: int
+    NUM_EPOCHS: int
     MINI_BATCH: int
     GRAD_ACCUM_STEPS: int
     PIN_MEMORY: int
     NUM_WORKERS_TRAIN: int
     NUM_WORKERS_EVAL: int
+    PERSISTANT_WORKERS: int
     MAX_LR: float
     MIN_LR: float
     WARMUP_STEPS: float
     MAX_STEPS: int
     EVAL_STEPS: int
+    BETA: float
+    LR_SCHEDULER: str
 
     class Config:
         env_file = ".env"
