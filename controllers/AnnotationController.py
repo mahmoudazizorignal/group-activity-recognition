@@ -1,11 +1,11 @@
 import os
 import pickle
-from .BaseController import BaseController
+from helpers import get_settings, Settings
 
-class AnnotateController(BaseController):
+class AnnotationController:
 
     def __init__(self, ):
-        super().__init__()
+        self.settings = get_settings()
         self.tracking_annotation_path = os.path.join(
             self.settings.BASE_PATH, 
             self.settings.TRACKING_ANNOTATION,
@@ -19,17 +19,6 @@ class AnnotateController(BaseController):
             self.settings.ANNOTATION_PATH,
         )
         self.annotations = {}
-    
-
-    class Player:
-        def __init__(self, x: int, y: int, h: int, w: int, frame_id: int, activity: str):
-            self.x = x
-            self.y = y
-            self.h = h
-            self.w = w
-            self.frame_id = frame_id
-            self.activity = activity
-    
 
     def _load_tracking_annotation(self, tracking_annotation_path: str):
 
@@ -42,20 +31,19 @@ class AnnotateController(BaseController):
 
                 if len(info) == 0 or int(info[0]) > 11: continue
 
-                players[int(info[0])].append(self.Player(
-                    x = int(info[1]),
-                    y = int(info[2]),
-                    h = int(info[3]) - int(info[1]),
-                    w = int(info[4]) - int(info[2]),
-                    frame_id = int(info[5]),
-                    activity=info[-1]
-                ))
+                players[int(info[0])].append([
+                    x := int(info[1]),
+                    y := int(info[2]),
+                    h := int(info[3]) - int(info[1]),
+                    w := int(info[4]) - int(info[2]),
+                    frame_id := int(info[5]),
+                    activity := info[-1],
+                ])
         
         for player in players:
             player = player[9 - self.settings.CNT_BEFORE_TARGET: 9 + self.settings.CNT_AFTER_TARGET + 1]
         
         return players
-
 
     def _load_group_annotations(self, group_annotation_path: str, target_frames: dict = dict()):
 
@@ -70,9 +58,9 @@ class AnnotateController(BaseController):
         
         return target_frames
 
-
     def process_annotations(self):
         target_frames = {}
+        annotations = {}
         for dirpath, dirnames, _ in os.walk(self.volleyball_annotation_path):
 
             if dirnames:
@@ -92,25 +80,37 @@ class AnnotateController(BaseController):
             
             video_no, clip_no = dirpath.split("/")[-2:]
             
-            if self.annotations.get(video_no, -1) == -1: 
+            if annotations.get(video_no, -1) == -1: 
                 print(f"processing frames annotations in video number {video_no} ......")
-                self.annotations[video_no] = {}
+                annotations[video_no] = {}
 
-            if self.annotations[video_no].get(clip_no, -1) == -1: 
-                self.annotations[video_no][clip_no] = {}
+            if annotations[video_no].get(clip_no, -1) == -1: 
+                annotations[video_no][clip_no] = {}
 
-            self.annotations[video_no][clip_no] = {
+            annotations[video_no][clip_no] = {
                 "group_activity": target_frames[clip_no],
                 "players": self._load_tracking_annotation(
                     os.path.join(self.tracking_annotation_path, video_no, clip_no, f"{clip_no}.txt")
                 ),
             }
-                    
+
+        self.annotations = annotations        
         return self.annotations
 
+    @classmethod
+    def get_annotations(cls):
+        settings = get_settings()
+        annotation_path = os.path.join(
+            settings.BASE_PATH,
+            settings.ANNOTATION_PATH,
+        )
+        assert os.path.exists(annotation_path), "annotations need to be processed first before you can get it!"
+        with open(annotation_path, "rb") as file:
+            annotations = pickle.load(file)
+        return annotations
 
     def save_annotations(self):
-
+        assert not self.annotations == {}, "annotations need to be processed first before you can save it!"
         with open(self.save_path, "wb") as file:
             pickle.dump(
                 obj = self.annotations, file = file,
