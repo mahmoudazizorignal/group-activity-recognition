@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     TRACKING_ANNOTATION: str
     DATASET_PATH: str
     ANNOTATION_PATH: str
+    TENSORBOARD_PATH: str
 
     TRAIN_VIDEOS: list
     VALIDATION_VIDEOS: list
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     
     CNT_BEFORE_TARGET: int
     CNT_AFTER_TARGET: int
+    FRAME_CNT: int
 
     GROUP_ACTION_CNT: int
     GROUP_ACTION_TO_ID: dict[str, int]
@@ -24,7 +26,11 @@ class Settings(BaseSettings):
     SEED: int
     NUM_EPOCHS: int
     MINI_BATCH: int
+    C: int
+    H: int
+    W: int
     GRAD_ACCUM_STEPS: int
+    EVAL_INTERVALS: int
     PIN_MEMORY: int
     NUM_WORKERS_TRAIN: int
     NUM_WORKERS_EVAL: int
