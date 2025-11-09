@@ -1,4 +1,6 @@
+import os
 import math
+import time
 from tqdm.auto import tqdm
 from typing import Any, Type
 
@@ -62,10 +64,38 @@ class TrainerController:
 
         self.settings = get_settings()
 
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+
         # sets the internal precision of float32 matrix multiplications.
         torch.set_float32_matmul_precision(self.settings.MATMUL_PRECISION)
 
         self.model = Model(num_classes=num_classes, resnet_pretrained=resnet_pretrained)
+
+        # only dumpy the input and the model details the first time we use a model type
+        if not os.path.exists(f"{self.model.tensorboard_path}/model"):
+
+            with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/model") as writer:
+                
+                # getting one batch of the data for visualization
+                x_batch, y_batch = next(iter(self.train_loader))
+                x_batch = x_batch.view(self.model.input_size)
+                y_batch = y_batch.view(self.model.target_size)
+
+                # visualize the structure of the model and its input
+                writer.add_graph(
+                    model=self.model, 
+                    input_to_model=(x_batch, y_batch),
+                )
+
+                # visualizing images in the batch
+                writer.add_images(
+                    tag="batch_example",
+                    img_tensor=x_batch,
+                    global_step=0,
+                )
+        
+        self.model.to(self.settings.DEVICE)
         self.model.compile()
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(), 
@@ -83,9 +113,6 @@ class TrainerController:
             num_classes=num_classes, 
             average="weighted"
         ).to(self.settings.DEVICE)
-
-        self.train_loader = train_loader
-        self.val_loader = val_loader
 
         if self.settings.LR_SCHEDULER == LREnums.COSINE_LR.value:
             self.scheduler = CosineLR(
@@ -105,13 +132,14 @@ class TrainerController:
                 initial_lr=self.settings.MAX_LR,
             )
         
-    def eval_model(self) -> tuple[float | Any, float | Any, float | Any]:
+    def eval_model(self, eval_loader: DataLoader) -> tuple[float | Any, float | Any, float | Any]:
     
         self.model.eval()
         with torch.inference_mode():
             running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
-            for xb, yb, in tqdm(self.val_loader):
+            for xb, yb, in tqdm(eval_loader):
                 xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
+                xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
                 
                 with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
                     logits, loss = self.model(xb, yb)
@@ -120,50 +148,47 @@ class TrainerController:
                 running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
                 running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
             
-            running_loss /= len(self.val_loader)
-            running_acc  /= len(self.val_loader)
-            running_f1   /= len(self.val_loader)
+            running_loss /= len(eval_loader)
+            running_acc  /= len(eval_loader)
+            running_f1   /= len(eval_loader)
 
         self.model.train()
         return running_loss, running_acc, running_f1
 
     def fit(self) -> nn.Module:
 
-        with SummaryWriter(log_dir=self.model.tensorboard_path) as writer:
-            
-            # getting one batch of the data for visualization
-            one_batch = next(iter(self.train_loader))
-            one_batch = one_batch.view(self.model.input_size)
-
-            # visualize the structure of the model and its input
-            writer.add_graph(
-                model=self.model, 
-                input_to_model=one_batch, 
-                verbose=True,
-            )
-
-            # visualizing images in the batch
-            writer.add_images(
-                tag="batch_example",
-                img_tensor=v2.ToDtype(torch.uint8, scale=True)(one_batch),
-                global_step=0,
-            )
+        self.model.train()
+        running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
+        val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
+        with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/run_{time.strftime('%Y%m%d-%H%M%S')}") as writer:
             
             step = 0
             for epoch in range(self.settings.NUM_EPOCHS):
 
                 running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
-                for i, (xb, yb) in tqdm(enumerate(self.train_loader)):
+                for i, (xb, yb) in enumerate(tqdm(self.train_loader)):
 
                     xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
+                    xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
                     with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
                         logits, loss = self.model(xb, yb)
-                    loss.backward()
 
                     loss_accum += loss.item()
 
-                    if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0 or i + 1 == len(self.train_loader):
+                    # calculate the gradients
+                    loss.backward()
 
+                    # cliping gradients to avoid exploading gradients
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
+                    if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0 or i + 1 == len(self.train_loader):
+                        
+                        # averaging the accum_loss the correct way
+                        if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0:
+                            loss_accum /= self.settings.GRAD_ACCUM_STEPS
+                        else:
+                            loss_accum /= int(len(self.train_loader) % self.settings.GRAD_ACCUM_STEPS)
+                        
                         # getting the updated learning rate
                         lr = self.scheduler.get_lr(step)
 
@@ -188,6 +213,18 @@ class TrainerController:
                         for param in self.optimizer.param_groups:
                             param["lr"] = lr
 
+
+                        # tracking the loss of each evaluation interval in the val
+                        if (step + 1) % self.settings.EVAL_INTERVALS == 0 and i + 1 != len(self.train_loader):
+                            val_accum_loss, _, _ = self.eval_model(self.val_loader)
+                            writer.add_scalar(
+                                tag="grad_accum_steps/val/loss", 
+                                scalar_value=val_accum_loss, 
+                                global_step=step,
+                            )
+
+                        step += 1
+
                         # tracking the ditributions of the gradients in the model
                         for name, param in self.model.named_parameters():
                             if param is not None:
@@ -196,20 +233,6 @@ class TrainerController:
                                     values=param.grad,
                                     global_step=step,
                                 )
-
-                        # tracking the loss of each gradient accumulation step in the val
-                        if (step + 1) % self.settings.EVAL_INTERVALS == 0:
-                            val_accum_loss, _, _ = self.eval_model()
-                            writer.add_scalar(
-                                tag="grad_accum_steps/val/loss", 
-                                scalar_value=val_accum_loss, 
-                                global_step=step,
-                            )
-
-                        step += 1
-                        
-                        # cliping gradients to avoid exploading gradients
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
                         # weights updates
                         self.optimizer.step()
@@ -225,7 +248,7 @@ class TrainerController:
                 running_acc  /= len(self.train_loader)
                 running_f1   /= len(self.train_loader)
 
-                val_loss, val_acc, val_f1 = self.eval_model()
+                val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
 
                 # tracking losses and metrics values
                 writer.add_scalar(tag="loss/train", scalar_value=running_loss, global_step=epoch)
@@ -240,5 +263,23 @@ class TrainerController:
                     torch.cuda.synchronize()
 
                 print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
+
+            # save all the hyperparameters to the tensorbaord
+            hparam_dict = {
+                key: value
+                for key, value in self.settings.model_dump().items()
+                if (not isinstance(value, dict)) and (not isinstance(value, list))
+            }
+            writer.add_hparams(
+                hparam_dict=hparam_dict,
+                metric_dict={
+                    "hparam/loss/train": running_loss,
+                    "hparam/loss/val": val_loss,
+                    "hparam/accuracy/train": running_acc,
+                    "hparam/accuracy/val": val_acc,
+                    "hparam/f1_score/train": running_f1,
+                    "hparam/f1_score/val": val_f1,
+                }
+            )
 
         return self.model
