@@ -4,7 +4,7 @@ from abc import ABC
 from torch.utils.data import Dataset
 from torchvision.io import decode_image
 from torchvision.transforms import v2
-from helpers import get_settings, Settings
+from helpers.config import get_settings, Settings
 
 
 class BaseDataset(ABC, Dataset):
@@ -33,23 +33,21 @@ class BaseDataset(ABC, Dataset):
         self.clips.sort()
 
 
-
 class GroupLevelDataset(BaseDataset):
 
     def __init__(self, videos_split: list, annotations: dict):
         super().__init__(videos_split, annotations)
         self.activity_to_id = self.settings.GROUP_ACTION_TO_ID
+        self.transform = v2.Compose([
+            v2.Resize(size=(256, 256), interpolation=v2.InterpolationMode.BILINEAR),
+            v2.CenterCrop(size=(224, 224)),
+            v2.ToDtype(dtype=torch.float32, scale=True),
+            v2.Normalize(mean=self.settings.NORM_MEAN, std=self.settings.NORM_STD),
+        ])
     
     def __len__(self):
         return len(self.clips)
 
-    def _process_image(self, x: torch.Tensor) -> torch.Tensor:
-        return v2.Compose([
-            v2.Resize(size=(256, 256), interpolation=v2.InterpolationMode.BILINEAR),
-            v2.CenterCrop(size=(224, 224)),
-            v2.ToDtype(dtype=torch.float32, scale=True),
-            v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])(x)
 
     def __getitem__(self, idx: int):
         clip_path = self.clips[idx]
@@ -62,7 +60,7 @@ class GroupLevelDataset(BaseDataset):
             clip_frames.append(decode_image(cur_frame_path))
 
         clip_frames = torch.stack(clip_frames) # (F, C, H, W)
-        x = self._process_image(clip_frames)
+        x = self.transform(clip_frames)
 
         activity_id = self.activity_to_id[self.annotations[video_no][middle_frame]["group_activity"]]
         y = torch.tensor([activity_id])
@@ -72,9 +70,12 @@ class GroupLevelDataset(BaseDataset):
 
 class PersonLevelDataset(BaseDataset):
 
-    def _process_image(self, x: torch.Tensor) -> torch.Tensor:
-        return v2.Compose([
-            v2.Resize(size=(256, 256), interpolation=v2.InterpolationMode.BILINEAR),
+    def __init__(self, videos_split: list, annotations: dict):
+        super().__init__(videos_split, annotations)
+        self.activity_to_id = self.settings.PLAYER_ACTION_TO_ID
+        self.transform = v2.Compose([
+            v2.Resize(size=(224, 224), interpolation=v2.InterpolationMode.BILINEAR),
             v2.ToDtype(dtype=torch.float32, scale=True),
-            v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ])(x)
+            v2.Normalize(mean=self.settings.NORM_MEAN, std=self.settings.NORM_STD),
+        ])
+
