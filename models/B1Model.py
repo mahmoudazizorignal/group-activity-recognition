@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 from typing import Optional
-from helpers import get_settings
+from helpers.config import get_settings
 from models.enums import TensorBoardEnums
 
 

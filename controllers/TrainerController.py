@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import v2
 from torchmetrics import Accuracy, F1Score
-from helpers import get_settings
+from helpers.config import get_settings
 from controllers.enums import LREnums
 
 
