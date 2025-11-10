@@ -29,7 +29,12 @@ class BaseDataset(ABC, Dataset):
         self.clips = []
         for video_no in videos_split:
             for clip_no in self.annotations[f"{video_no}"].keys():
-                self.clips.append(f"{self.__dataset_path}/{video_no}/{clip_no}")
+                clip_dir = os.path.join(
+                    self.__dataset_path,
+                    video_no,
+                    clip_no,
+                )
+                self.clips.append(clip_dir)
         self.clips.sort()
 
 
@@ -53,10 +58,19 @@ class GroupLevelDataset(BaseDataset):
         clip_path = self.clips[idx]
         video_no, middle_frame = clip_path.split("/")[-2:]
 
-        cur_clip_folder = f"{self._BaseDataset__dataset_path}/{video_no}/{middle_frame}"
+        cur_clip_folder = os.path.join(
+            self._BaseDataset__dataset_path,
+            video_no,
+            middle_frame,
+        )
+        # cur_clip_folder = f"{self._BaseDataset__dataset_path}/{video_no}/{middle_frame}"
         clip_frames = []
         for frame in range(int(middle_frame) - self.no_frames_before, int(middle_frame) + self.no_frames_after + 1):
-            cur_frame_path = f"{cur_clip_folder}/{frame}.jpg"
+            cur_frame_path = os.path.join(
+                cur_clip_folder,
+                f"{frame}.jpg",
+            )
+            # cur_frame_path = f"{cur_clip_folder}/{frame}.jpg"
             clip_frames.append(decode_image(cur_frame_path))
 
         clip_frames = torch.stack(clip_frames) # (F, C, H, W)
