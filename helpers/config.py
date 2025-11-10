@@ -20,15 +20,17 @@ class Settings(BaseSettings):
     GROUP_ACTION_TO_ID: dict[str, int]
     PLAYER_ACTION_CNT: int
     PLAYER_ACTION_TO_ID: dict[str, int]
-
+    C: int
+    H: int
+    W: int
+    NORM_MEAN: list
+    NORM_STD: list
+    
     DEVICE: str
     MATMUL_PRECISION: str
     SEED: int
     NUM_EPOCHS: int
     MINI_BATCH: int
-    C: int
-    H: int
-    W: int
     GRAD_ACCUM_STEPS: int
     EVAL_INTERVALS: int
     PIN_MEMORY: int
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
     PERSISTANT_WORKERS: int
     MAX_LR: float
     MIN_LR: float
-    WARMUP_STEPS: float
+    WARMUP_STEPS: int
     MAX_STEPS: int
     BETA: float
     LR_SCHEDULER: str
