@@ -58,11 +58,9 @@ Set your environment variables in the `.env` file.
 chmod 600 ~/.config/kaggle/kaggle.json
 ```
 
-### Downloading the dataset and process annotations
+### Downloading the dataset
 
 ```bash
 $ chmod +x scripts/download-dataset.sh
 $ scripts/download-dataset.sh
-$ chmod +x scripts/process-annotations.sh
-$ scripts/process-annotations.sh
 ```
