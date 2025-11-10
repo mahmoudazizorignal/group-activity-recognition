@@ -1,6 +1,6 @@
 import os
 import pickle
-from helpers import get_settings, Settings
+from helpers.config import get_settings, Settings
 
 class AnnotationController:
 
