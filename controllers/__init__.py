@@ -1,3 +1,3 @@
 from .AnnotationController import AnnotationController
-from .DatasetController import GroupLevelDataset
+from .DatasetController import GroupLevelDataset, PersonLevelDataset
 from .TrainerController import TrainerController
