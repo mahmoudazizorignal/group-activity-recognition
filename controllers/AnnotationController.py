@@ -32,10 +32,10 @@ class AnnotationController:
                 if len(info) == 0 or int(info[0]) > 11: continue
 
                 players[int(info[0])].append([
-                    x := int(info[1]),
-                    y := int(info[2]),
-                    h := int(info[3]) - int(info[1]),
-                    w := int(info[4]) - int(info[2]),
+                    x        := int(info[1]),
+                    y        := int(info[2]),
+                    h        := int(info[3]) - int(info[1]),
+                    w        := int(info[4]) - int(info[2]),
                     frame_id := int(info[5]),
                     activity := info[-1],
                 ])
