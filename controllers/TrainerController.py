@@ -31,7 +31,6 @@ class CosineLR:
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
         return self.min_lr + coeff * (self.max_lr - self.min_lr)
 
-
 class ExponentialLR:
 
     def __init__(self, initial_lr: float, beta: float):
@@ -70,9 +69,9 @@ class TrainerController:
         # sets the internal precision of float32 matrix multiplications.
         torch.set_float32_matmul_precision(self.settings.MATMUL_PRECISION)
 
-        self.model = Model(num_classes=num_classes, resnet_pretrained=resnet_pretrained)
+        self.model = Model(resnet_pretrained=resnet_pretrained)
 
-        # only dumpy the input and the model details the first time we use a model type
+        # only dump the input and the model details the first time we use a model type
         if not os.path.exists(f"{self.model.tensorboard_path}/model"):
 
             with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/model") as writer:
@@ -168,18 +167,19 @@ class TrainerController:
                 running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
                 for i, (xb, yb) in enumerate(tqdm(self.train_loader)):
 
+                    # move the tensors to the right device and reshape
                     xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
-                    xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
+                    # xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
+
+                    # do the forward path
                     with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
                         logits, loss = self.model(xb, yb)
 
+                    # accumulate the loss
                     loss_accum += loss.item()
 
                     # calculate the gradients
                     loss.backward()
-
-                    # cliping gradients to avoid exploading gradients
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
                     if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0 or i + 1 == len(self.train_loader):
                         
@@ -234,20 +234,26 @@ class TrainerController:
                                     global_step=step,
                                 )
 
+                        # cliping gradients to avoid exploading gradients
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
                         # weights updates
                         self.optimizer.step()
 
                         # zeroing all the gradients
                         self.optimizer.zero_grad()    
 
+                    # accumulate loss, accuracy, and f1 values on each mini batch
                     running_loss += loss.item()
                     running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
                     running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
 
+                # averaging our values by the number of mini batches
                 running_loss /= len(self.train_loader)
                 running_acc  /= len(self.train_loader)
                 running_f1   /= len(self.train_loader)
 
+                # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
                 val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
 
                 # tracking losses and metrics values
