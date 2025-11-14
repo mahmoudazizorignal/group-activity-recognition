@@ -8,7 +8,7 @@ from helpers.config import get_settings
 from models.enums import TensorBoardEnums
 
 
-class B1B3Model(nn.Module):
+class B1Model(nn.Module):
 
     def __init__(self, num_classes: int, resnet_pretrained: bool):
         super().__init__()
@@ -23,7 +23,7 @@ class B1B3Model(nn.Module):
         self.target_size = (-1,)
         self.tensorboard_path = os.path.join(
             self.settings.TENSORBOARD_PATH,
-            TensorBoardEnums.B1_TENSORBOARD_PATH.value,
+            TensorBoardEnums.B1_TENSORBOARD_DIR.value,
         )
 
         if resnet_pretrained:
