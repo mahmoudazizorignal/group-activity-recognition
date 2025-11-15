@@ -169,7 +169,7 @@ class TrainerController:
 
                     # move the tensors to the right device and reshape
                     xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
-                    # xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
+                    xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
 
                     # do the forward path
                     with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
