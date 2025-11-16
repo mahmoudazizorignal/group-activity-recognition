@@ -12,6 +12,7 @@ from torchvision.transforms import v2
 from torchmetrics import Accuracy, F1Score
 from helpers.config import get_settings
 from models.enums import LREnums
+from typing import Optional
 
 
 class CosineLR:
@@ -56,15 +57,17 @@ class TrainerController:
     
     def __init__(self, 
                  Model: Type[nn.Module], 
+                 num_classes: int,
                  train_loader: DataLoader, 
                  val_loader: DataLoader, 
-                 num_classes: int,
-                 resnet_pretrained: bool):
+                 test_loader: Optional[DataLoader] = None,
+                 resnet_pretrained: bool = True):
 
         self.settings = get_settings()
 
         self.train_loader = train_loader
         self.val_loader = val_loader
+        self.test_loader = test_loader
 
         # sets the internal precision of float32 matrix multiplications.
         torch.set_float32_matmul_precision(self.settings.MATMUL_PRECISION)
@@ -269,6 +272,15 @@ class TrainerController:
                     torch.cuda.synchronize()
 
                 print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
+
+            # test model if a test set was given
+            if self.test_loader is not None:
+                test_loss, test_acc, test_f1 = self.eval_model(eval_loader=self.test_loader)
+
+                # track metrics for each experiment
+                writer.add_scalar(tag="loss/test", scalar_value=test_loss, global_step=0)
+                writer.add_scalar(tag="accuracy/test", scalar_value=test_acc, global_step=0)
+                writer.add_scalar(tag="f1_score/test", scalar_value=test_f1, global_step=0)
 
             # save all the hyperparameters to the tensorbaord
             hparam_dict = {
