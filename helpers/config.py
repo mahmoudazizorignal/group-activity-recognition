@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     MIN_LR: float
     WARMUP_STEPS: int
     MAX_STEPS: int
+    INITIAL_LR: float
     BETA: float
     LR_SCHEDULER: str
 
