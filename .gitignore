@@ -216,7 +216,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Dataset files
-dataset/
+data/
 
 # for lightning ai
 .lightning_studio/
@@ -229,3 +229,6 @@ dataset/
 # models checkpoints
 *.pt
 *.pth
+
+
+*.Identifier
