@@ -1,81 +1,61 @@
 import os
-import math
 import time
-from tqdm.auto import tqdm
-from typing import Any, Type
-
 import torch
 import torch.nn as nn
+from tqdm.auto import tqdm
+from typing import Optional, Any, Type
+from helpers.config import Settings
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import v2
 from torchmetrics import Accuracy, F1Score
-from helpers.config import get_settings
-from models.enums import LREnums
-from typing import Optional
-
-
-class CosineLR:
-    def __init__(self, max_steps, warmup_steps, max_lr, min_lr):
-        self.max_steps = max_steps
-        self.warmup_steps = warmup_steps
-        self.max_lr = max_lr
-        self.min_lr = min_lr
-
-    def get_lr(self, it: int) -> float:
-        if it < self.warmup_steps:
-            return self.max_lr * (it + 1) / self.warmup_steps
-        if it > self.max_steps:
-            return self.min_lr
-        decay_ratio = (it - self.warmup_steps) / (self.max_steps - self.warmup_steps)
-        assert 0 <= decay_ratio <= 1
-        coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
-        return self.min_lr + coeff * (self.max_lr - self.min_lr)
-
-class ExponentialLR:
-
-    def __init__(self, initial_lr: float, beta: float):
-        assert 0 <= beta <= 1.0, f"expected beta to be in range [0, 1], instead got: {beta}"
-        self.lr = initial_lr
-        self.beta = beta
-    
-    def get_lr(self, it=None) -> float:
-        cur_lr = self.beta * self.lr
-        self.lr *= self.beta
-        return cur_lr
-
-class IdentityLR:
-
-    def __init__(self, initial_lr: float):
-        self.lr = initial_lr
-
-    def get_lr(self, it=None) -> float:
-        return self.lr
+from models.lr import LRProviderFactory
+from models.lr.LREnums import LREnums
+from models.baselines import BaselinesProviderFactory
+from models.baselines.BaselinesEnums import BaselinesEnums
+from torch.utils.tensorboard import SummaryWriter
 
 
 class TrainerController:
     
     def __init__(self, 
-                 Model: Type[nn.Module], 
+                 baseline: BaselinesEnums,
+                 lr_scheduler: LREnums,
                  num_classes: int,
+                 settings: Settings,
                  train_loader: DataLoader, 
                  val_loader: DataLoader, 
                  test_loader: Optional[DataLoader] = None,
-                 resnet_pretrained: bool = True):
+                 resnet_pretrained: bool = True,
+                 tensorboard_track: bool = True,):
 
-        self.settings = get_settings()
+        self.settings = settings
+        self.tensorboard_track = tensorboard_track
 
+        # setting our dataset loaders
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
 
+        # getting our learning rate scheduler
+        self.scheduler = LRProviderFactory(settings=settings).create(
+            provider=lr_scheduler,
+        )
+        
+        if not self.scheduler:
+            raise TypeError("invalid lr scheduler!")
+        
         # sets the internal precision of float32 matrix multiplications.
         torch.set_float32_matmul_precision(self.settings.MATMUL_PRECISION)
 
-        self.model = Model(resnet_pretrained=resnet_pretrained)
+        # initialize our model
+        self.model = BaselinesProviderFactory(
+            settings=settings
+        ).create(provider=baseline, resnet_pretrained=resnet_pretrained)
 
+        if not self.model:
+            raise TypeError("invalid model type!")
+        
         # only dump the input and the model details the first time we use a model type
-        if not os.path.exists(f"{self.model.tensorboard_path}/model"):
+        if tensorboard_track and not os.path.exists(f"{self.model.tensorboard_path}/model"):
 
             with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/model") as writer:
                 
@@ -96,46 +76,31 @@ class TrainerController:
                     img_tensor=x_batch,
                     global_step=0,
                 )
-        
+      
+        # move the model to the specified device  
         self.model.to(self.settings.DEVICE)
+        
+        # compile the model
         self.model.compile()
-        self.optimizer = torch.optim.AdamW(
-            self.model.parameters(), 
-            fused=torch.cuda.is_available()
-        )
+        
+        # define the optimizer
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), fused=torch.cuda.is_available())
 
         # settings our evaluation metrics
         self.accuracy = Accuracy(
             task="multiclass", 
             num_classes=num_classes
         ).to(self.settings.DEVICE)
-
+        
         self.f1_score = F1Score(
             task="multiclass", 
             num_classes=num_classes, 
             average="weighted"
         ).to(self.settings.DEVICE)
-
-        if self.settings.LR_SCHEDULER == LREnums.COSINE_LR.value:
-            self.scheduler = CosineLR(
-                max_steps=self.settings.NUM_EPOCHS * len(train_loader) / self.settings.GRAD_ACCUM_STEPS,
-                warmup_steps=self.settings.WARMUP_STEPS,
-                max_lr=self.settings.MAX_LR,
-                min_lr=self.settings.MIN_LR,
-            )
         
-        elif self.settings.LR_SCHEDULER == LREnums.EXPONENTIAL_LR.value:
-            self.scheduler = ExponentialLR(
-                initial_lr=self.settings.MAX_LR,
-                beta=self.settings.BETA,
-            )
-        else:
-            self.scheduler = IdentityLR(
-                initial_lr=self.settings.MAX_LR,
-            )
         
     def eval_model(self, eval_loader: DataLoader) -> tuple[float | Any, float | Any, float | Any]:
-    
+        # set the model to evaluation mode
         self.model.eval()
         with torch.inference_mode():
             running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
@@ -154,47 +119,50 @@ class TrainerController:
             running_acc  /= len(eval_loader)
             running_f1   /= len(eval_loader)
 
+        # set the model back to the training mode
         self.model.train()
+        
         return running_loss, running_acc, running_f1
 
     def fit(self) -> nn.Module:
 
+        # set the model to the training mode
         self.model.train()
+
+        # intialize tensorboard SummaryWriter if we want to track the experiment
+        if self.tensorboard_track:
+            writer = SummaryWriter(log_dir=f"{self.model.tensorboard_path}/run_{time.strftime('%Y%m%d-%H%M%S')}")
+        
+        step = 0
         running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
         val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
-        with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/run_{time.strftime('%Y%m%d-%H%M%S')}") as writer:
-            
-            step = 0
-            for epoch in range(self.settings.NUM_EPOCHS):
+        for epoch in range(self.settings.NUM_EPOCHS):
 
-                running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
-                for i, (xb, yb) in enumerate(tqdm(self.train_loader)):
+            running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
+            for i, (xb, yb) in enumerate(tqdm(self.train_loader)):
 
-                    # move the tensors to the right device and reshape
-                    xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
-                    xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
+                # move the tensors to the right device and reshape
+                xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
+                xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
 
-                    # do the forward path
-                    with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
-                        logits, loss = self.model(xb, yb)
+                # do the forward path
+                with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
+                    logits, loss = self.model(xb, yb)
 
-                    # accumulate the loss
-                    loss_accum += loss.item()
+                # divide the loss by the number of gradient accumulation steps
+                loss /= self.settings.GRAD_ACCUM_STEPS
 
-                    # calculate the gradients
-                    loss.backward()
+                # accumulate the loss
+                loss_accum += loss.item()
 
-                    if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0 or i + 1 == len(self.train_loader):
-                        
-                        # averaging the accum_loss the correct way
-                        if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0:
-                            loss_accum /= self.settings.GRAD_ACCUM_STEPS
-                        else:
-                            loss_accum /= int(len(self.train_loader) % self.settings.GRAD_ACCUM_STEPS)
-                        
-                        # getting the updated learning rate
-                        lr = self.scheduler.get_lr(step)
+                # calculate the gradients
+                loss.backward()
 
+                if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0:
+                    # getting the updated learning rate
+                    lr = self.scheduler.get_lr(step)
+
+                    if self.tensorboard_track:
                         # tracking learning rate values
                         writer.add_scalar(
                             tag="lr_scheduler", 
@@ -209,56 +177,60 @@ class TrainerController:
                             global_step=step,
                         )
 
-                        # zeroing loss accumulation after using it
-                        loss_accum = 0.0
+                    # zeroing loss accumulation after using it
+                    loss_accum = 0.0
 
-                        # updating our learning rate
-                        for param in self.optimizer.param_groups:
-                            param["lr"] = lr
+                    # updating our learning rate
+                    for param in self.optimizer.param_groups:
+                        param["lr"] = lr
 
 
-                        # tracking the loss of each evaluation interval in the val
-                        if (step + 1) % self.settings.EVAL_INTERVALS == 0 and i + 1 != len(self.train_loader):
-                            val_accum_loss, _, _ = self.eval_model(self.val_loader)
+                    # tracking the loss of each evaluation interval in the val
+                    if (step + 1) % self.settings.EVAL_INTERVALS == 0 and i + 1 != len(self.train_loader):
+                        val_accum_loss, _, _ = self.eval_model(self.val_loader)
+                        
+                        if self.tensorboard_track:
                             writer.add_scalar(
                                 tag="grad_accum_steps/val/loss", 
                                 scalar_value=val_accum_loss, 
                                 global_step=step,
                             )
 
-                        step += 1
+                    # increment number of gradient accumulation steps done
+                    step += 1
 
-                        # tracking the ditributions of the gradients in the model
-                        for name, param in self.model.named_parameters():
-                            if param is not None:
-                                writer.add_histogram(
-                                    tag=f"{name}.grad",
-                                    values=param.grad,
-                                    global_step=step,
-                                )
+                    # tracking the ditributions of the gradients in the model
+                    for name, param in self.model.named_parameters():
+                        if self.tensorboard_track and param is not None:
+                            writer.add_histogram(
+                                tag=f"{name}.grad",
+                                values=param.grad,
+                                global_step=step,
+                            )
 
-                        # cliping gradients to avoid exploading gradients
-                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                    # cliping gradients to avoid exploading gradients
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
-                        # weights updates
-                        self.optimizer.step()
+                    # weights updates
+                    self.optimizer.step()
 
-                        # zeroing all the gradients
-                        self.optimizer.zero_grad()    
+                    # zeroing all the gradients
+                    self.optimizer.zero_grad()    
 
-                    # accumulate loss, accuracy, and f1 values on each mini batch
-                    running_loss += loss.item()
-                    running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
-                    running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
+                # accumulate loss, accuracy, and f1 values on each mini batch
+                running_loss += loss.item()
+                running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
+                running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
 
-                # averaging our values by the number of mini batches
-                running_loss /= len(self.train_loader)
-                running_acc  /= len(self.train_loader)
-                running_f1   /= len(self.train_loader)
+            # averaging our values by the number of mini batches
+            running_loss /= len(self.train_loader)
+            running_acc  /= len(self.train_loader)
+            running_f1   /= len(self.train_loader)
 
-                # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
-                val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
+            # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
+            val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
 
+            if self.tensorboard_track:
                 # tracking losses and metrics values
                 writer.add_scalar(tag="loss/train", scalar_value=running_loss, global_step=epoch)
                 writer.add_scalar(tag="loss/val", scalar_value=val_loss, global_step=epoch)
@@ -267,21 +239,20 @@ class TrainerController:
                 writer.add_scalar(tag="f1_score/train", scalar_value=running_f1, global_step=epoch)
                 writer.add_scalar(tag="f1_score/val", scalar_value=val_f1, global_step=epoch)
 
-                # wait for all cuda kernels to finish
-                if torch.cuda.is_available():
-                    torch.cuda.synchronize()
 
-                print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
+            print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
 
-            # test model if a test set was given
-            if self.test_loader is not None:
-                test_loss, test_acc, test_f1 = self.eval_model(eval_loader=self.test_loader)
+        # test model if a test set was given
+        if self.test_loader is not None:
+            test_loss, test_acc, test_f1 = self.eval_model(eval_loader=self.test_loader)
 
+            if self.tensorboard_track:
                 # track metrics for each experiment
                 writer.add_scalar(tag="loss/test", scalar_value=test_loss, global_step=0)
                 writer.add_scalar(tag="accuracy/test", scalar_value=test_acc, global_step=0)
                 writer.add_scalar(tag="f1_score/test", scalar_value=test_f1, global_step=0)
 
+        if self.tensorboard_track:
             # save all the hyperparameters to the tensorbaord
             hparam_dict = {
                 key: value
@@ -299,5 +270,7 @@ class TrainerController:
                     "hparam/f1_score/val": val_f1,
                 }
             )
+
+            writer.close()
 
         return self.model

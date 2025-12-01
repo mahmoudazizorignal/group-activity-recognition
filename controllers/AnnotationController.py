@@ -1,11 +1,11 @@
 import os
 import pickle
-from helpers.config import get_settings, Settings
+from helpers.config import Settings
 
 class AnnotationController:
 
-    def __init__(self, ):
-        self.settings = get_settings()
+    def __init__(self, settings: Settings):
+        self.settings = settings
         self.tracking_annotation_path = os.path.join(
             self.settings.BASE_PATH, 
             self.settings.TRACKING_ANNOTATION,
@@ -98,8 +98,8 @@ class AnnotationController:
         return self.annotations
 
     @classmethod
-    def get_annotations(cls):
-        settings = get_settings()
+    def get_annotations(cls, settings: Settings):
+        settings = settings
         annotation_path = os.path.join(
             settings.BASE_PATH,
             settings.ANNOTATION_PATH,
