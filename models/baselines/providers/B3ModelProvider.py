@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchmetrics import Accuracy, F1Score
 from helpers.config import Settings
 from typing import Optional, Any, Tuple
 from models.baselines.BaselinesInterface import BaselinesInterface
@@ -9,35 +10,70 @@ from models.baselines.BaselinesEnums import TensorBoardEnums
 
 class B3ModelProvider(BaselinesInterface):
     
-    def __init__(self, settings: Settings, resnet_pretrained: bool):
-        super().__init__(settings = settings,resnet_pretrained=resnet_pretrained)
-        
-        # define the expected shape of the input of the model and the output of the model 
-        self.input_size = (-1, self.settings.C, self.settings.H, self.settings.W)
-        self.target_size = (-1,)
+    def __init__(self, settings: Settings, resnet_pretrained: bool, resnet_finetuned: Optional[nn.Module] = None):
+        super().__init__(
+            settings = settings, 
+            resnet_pretrained = resnet_pretrained, 
+            resnet_finetuned = resnet_finetuned,
+        )
+
+        # define the fully connected layer
+        self.fc = nn.Linear(in_features=2048, out_features=settings.GROUP_ACTION_CNT)
+        torch.nn.init.normal_(self.fc.weight, mean=0.0, std=0.02)
         
         # define the tensorboard path
         self.tensorboard_path = os.path.join(
             self.settings.TENSORBOARD_PATH,
             TensorBoardEnums.B3_TENSORBOARD_DIR.value,
         )
-        
-        # define the architecture of b3-model
-        self.model = nn.ModuleDict(dict(
-            resnet=self.resnet,
-            head=nn.Linear(in_features=2048, out_features=self.settings.PLAYER_ACTION_CNT)
-        ))
-        
-        # initialize the new head of the model
-        torch.nn.init.normal_(self.model.fc.weight, mean=0.0, std=0.02)
-    
-    def forward(self, x: torch.Tensor, y: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Any]:
-        x = x.view(self.input_size)
 
-        logits = self.model(x)
-        loss = None
-        if y is not None:
-            y = y.view(self.target_size)
-            loss = F.cross_entropy(logits, y)
-            
-        return logits, loss
+        # settings our evaluation metrics
+        self.accuracy = Accuracy(
+            task="multiclass", 
+            num_classes=settings.GROUP_ACTION_CNT
+        )
+        self.f1_score = F1Score(
+            task="multiclass", 
+            num_classes=settings.GROUP_ACTION_CNT, 
+            average="weighted"
+        )
+
+        # disable compiling for metrics calculation
+        self.accuracy.forward = torch.compiler.disable(self.accuracy.forward)
+        self.f1_score.forward = torch.compiler.disable(self.f1_score.forward)
+
+    def forward(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        # get the input and the group annotations only
+        x, _, y = batch
+        
+        # swap the frame count and player count
+        x = x.permute(0, 2, 1, 3, 4, 5).contiguous().view(
+            -1, 
+            self.settings.PLAYER_CNT, 
+            self.settings.C,
+            self.settings.H,
+            self.settings.W,
+        )
+
+        # move the right device
+        x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
+
+        # extract the feature representations for person crops
+        x = self.resnet(x.view(-1, self.settings.C, self.settings.H, self.settings.W)).squeeze().view(
+            x.shape[0],
+            self.settings.PLAYER_CNT, 
+            -1
+        )
+        
+        # max pool the features across all players: (B, P, 2048) => (B, 2048)
+        x, _ = torch.max(x, dim=1)
+
+        # get the logits
+        logits = self.fc(x)
+        
+        # calculate the cross entropy loss, accuracy, and f1-score of the batch
+        loss = F.cross_entropy(logits, y.view(-1))
+        acc  = self.accuracy(logits.argmax(dim=1), y.view(-1))
+        f1   = self.f1_score(logits.argmax(dim=1), y.view(-1))
+        
+        return logits, loss, acc, f1

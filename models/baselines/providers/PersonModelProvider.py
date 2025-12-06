@@ -8,7 +8,7 @@ from typing import Tuple
 from models.baselines.BaselinesInterface import BaselinesInterface
 from models.baselines.BaselinesEnums import TensorBoardEnums
 
-class B1ModelProvider(BaselinesInterface):
+class PersonModelProvider(BaselinesInterface):
     
     def __init__(self, settings: Settings, resnet_pretrained: bool):
         super().__init__(settings = settings,resnet_pretrained=resnet_pretrained, resnet_finetuned=None)
@@ -16,13 +16,13 @@ class B1ModelProvider(BaselinesInterface):
         # define the tensorboard path
         self.tensorboard_path = os.path.join(
             self.settings.TENSORBOARD_PATH,
-            TensorBoardEnums.B1_TENSORBOARD_DIR.value,
+            TensorBoardEnums.PERSON_TENSORBOARD_DIR.value,
         )
 
         # define the architecture of b1-model
         self.model = nn.ModuleDict(dict(
             resnet=self.resnet,
-            head=nn.Linear(in_features=2048, out_features=self.settings.GROUP_ACTION_CNT)
+            head=nn.Linear(in_features=2048, out_features=self.settings.PLAYER_ACTION_CNT)
         ))
         
         # initialize the new head of the model
@@ -31,22 +31,22 @@ class B1ModelProvider(BaselinesInterface):
         # settings our evaluation metrics
         self.accuracy = Accuracy(
             task="multiclass", 
-            num_classes=settings.GROUP_ACTION_CNT
+            num_classes=settings.PLAYER_ACTION_CNT
         )
         
         self.f1_score = F1Score(
             task="multiclass", 
-            num_classes=settings.GROUP_ACTION_CNT, 
+            num_classes=settings.PLAYER_ACTION_CNT, 
             average="weighted"
         )
 
         # disable compiling for metrics calculation
         self.accuracy.forward = torch.compiler.disable(self.accuracy.forward)
         self.f1_score.forward = torch.compiler.disable(self.f1_score.forward)
-    
-    def forward(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+
+    def forward(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # get the input and output of the batch and move it to the right device
-        x, y = batch
+        x, y, _ = batch
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
 
         # reshape the batch
