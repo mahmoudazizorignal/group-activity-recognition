@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     CNT_BEFORE_TARGET: int
     CNT_AFTER_TARGET: int
     FRAME_CNT: int
-
+    PLAYER_CNT: int
     GROUP_ACTION_CNT: int
     GROUP_ACTION_TO_ID: dict[str, int]
     PLAYER_ACTION_CNT: int
@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     MAX_STEPS: int
     INITIAL_LR: float
     BETA: float
-    LR_SCHEDULER: str
+    NO_LSTM_LAYERS: int
+    NO_LSTM_HIDDEN_UNITS: int
 
     class Config:
         env_file = ".env"
