@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DATASET_PATH="dataset/volleyball"
+DATASET_PATH="data/volleyball"
 
 if test -d "$DATASET_PATH"; then
 
