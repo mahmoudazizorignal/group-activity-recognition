@@ -26,6 +26,7 @@ class B4ModelProvider(BaselinesInterface):
             hidden_size=settings.NO_LSTM_HIDDEN_UNITS,
             num_layers=settings.NO_LSTM_LAYERS,
             batch_first=True,
+            dropout=settings.LSTM_DROPOUT_RATE,
             proj_size=settings.GROUP_ACTION_CNT,
         )
 
