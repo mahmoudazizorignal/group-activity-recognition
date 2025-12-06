@@ -1,7 +1,10 @@
 
 # Hierarchical Deep Temporal Models for Group Activity Recognition
 
-![Group activity recognition via a hierarchical model](assets/hierarchical-model-visualize.jpeg "Group activity recognition via a hierarchical model")
+<center>
+    <img src="assets/hierarchical-model-visualize.jpeg">
+</center>
+
 
 This repo is an implementation for this paper (Mostafa et al., [2016](https://arxiv.org/abs/1511.06040))
 
