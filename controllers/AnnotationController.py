@@ -3,7 +3,27 @@ import pickle
 from helpers.config import Settings
 
 class AnnotationController:
-
+    """
+    Controller class for processing, loading, and saving video dataset annotations.
+    
+    This class handles the processing of tracking annotations (player bounding boxes and
+    individual actions) and group activity annotations from the volleyball dataset. It
+    consolidates these annotations into a unified structure and provides utilities for
+    saving and loading the processed annotations.
+    
+    Attributes:
+        settings (Settings): Configuration object containing paths and parameters.
+        tracking_annotation_path (str): Path to the directory containing tracking annotations
+            with player bounding boxes and individual actions.
+        volleyball_annotation_path (str): Path to the volleyball dataset directory containing
+            group activity annotations.
+        save_path (str): Path where processed annotations will be saved.
+        annotations (dict): Nested dictionary storing processed annotations with structure:
+            {video_no: {frame_no: {"group_activity": str, "players": list}}}
+    
+    Args:
+        settings (Settings): Configuration object containing dataset paths and parameters.
+    """
     def __init__(self, settings: Settings):
         self.settings = settings
         self.tracking_annotation_path = os.path.join(
@@ -21,7 +41,26 @@ class AnnotationController:
         self.annotations = {}
 
     def _load_tracking_annotation(self, tracking_annotation_path: str):
-
+        """
+        Load tracking annotations for individual players from a file.
+        
+        Parses a tracking annotation file containing bounding box coordinates, frame IDs,
+        and activity labels for up to 12 players. Each player's annotations are stored as
+        a list of frames with their corresponding bounding box information and activity.
+        
+        Args:
+            tracking_annotation_path (str): Path to the tracking annotation text file.
+        
+        Returns:
+            list: A list of 12 sublists, one per player. Each sublist contains frame
+                annotations as [x, y, h, w, frame_id, activity], where:
+                - x (int): Left coordinate of bounding box
+                - y (int): Top coordinate of bounding box
+                - h (int): Height of bounding box
+                - w (int): Width of bounding box
+                - frame_id (int): Frame number
+                - activity (str): Individual player activity label
+        """
         players = [[] for _ in range(12)]
         with open(tracking_annotation_path, "r", encoding="utf-8") as file:
             
@@ -46,7 +85,21 @@ class AnnotationController:
         return players
 
     def _load_group_annotations(self, group_annotation_path: str, target_frames: dict = dict()):
-
+        """
+        Load group activity annotations from a file.
+        
+        Parses a group annotation file that contains frame identifiers and their
+        corresponding group activity labels. Updates the provided target_frames
+        dictionary with the parsed annotations.
+        
+        Args:
+            group_annotation_path (str): Path to the group annotation text file.
+            target_frames (dict, optional): Existing dictionary to update with new
+                annotations. Defaults to an empty dictionary.
+        
+        Returns:
+            dict: Dictionary mapping frame identifiers (str) to group activity labels (str).
+        """
         with open(group_annotation_path, "r", encoding="utf-8") as file:
             
             for line in file:
@@ -59,6 +112,25 @@ class AnnotationController:
         return target_frames
 
     def process_annotations(self):
+        """
+        Process all annotations from the volleyball dataset directory.
+        
+        Traverses the dataset directory structure to load both group activity annotations
+        and player tracking annotations. Consolidates all annotations into a nested
+        dictionary structure organized by video number and frame number. The processed
+        annotations are stored in the `annotations` attribute.
+        
+        The method processes:
+        - Group activity labels for each target frame
+        - Player bounding boxes and individual action labels for each frame
+        
+        Returns:
+            dict: Nested dictionary with structure:
+                {video_no: {frame_no: {
+                    "group_activity": str,
+                    "players": list of player annotations
+                }}}
+        """
         target_frames = {}
         annotations = {}
         for dirpath, dirnames, _ in os.walk(self.volleyball_annotation_path):
@@ -99,6 +171,25 @@ class AnnotationController:
 
     @classmethod
     def get_annotations(cls, settings: Settings):
+        """
+        Load previously saved annotations from disk.
+        
+        Class method to retrieve annotations that have been processed and saved using
+        the `save_annotations` method. This provides a convenient way to load annotations
+        without needing to reprocess them.
+        
+        Args:
+            settings (Settings): Configuration object containing the base path and
+                annotation file path.
+        
+        Returns:
+            dict: The loaded annotations dictionary with the same structure as produced
+                by `process_annotations`.
+        
+        Raises:
+            AssertionError: If the annotation file does not exist at the specified path,
+                indicating that annotations need to be processed first.
+        """
         settings = settings
         annotation_path = os.path.join(
             settings.BASE_PATH,
@@ -110,6 +201,20 @@ class AnnotationController:
         return annotations
 
     def save_annotations(self):
+        """
+        Save processed annotations to disk using pickle serialization.
+        
+        Serializes the processed annotations dictionary and saves it to the path specified
+        in the settings. This allows for efficient loading of annotations in future runs
+        without reprocessing.
+        
+        Returns:
+            str: The file path where annotations were saved.
+        
+        Raises:
+            AssertionError: If the annotations dictionary is empty, indicating that
+                `process_annotations` needs to be called first.
+        """
         assert not self.annotations == {}, "annotations need to be processed first before you can save it!"
         with open(self.save_path, "wb") as file:
             pickle.dump(
