@@ -216,7 +216,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Dataset files
-data/
+volleyball/
 
 # for lightning ai
 .lightning_studio/
@@ -227,8 +227,8 @@ data/
 .windsurf-server
 
 # models checkpoints
-*.pt
-*.pth
+checkpoints/
 
-
+*.viminfo
 *.Identifier
+*.toml
