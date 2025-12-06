@@ -141,7 +141,7 @@ class AnnotationController:
                 
                 if not os.path.exists(group_annotation_path): continue
 
-                print(f"processing group annotations of video number {dirpath.split("/")[-1]} .....")
+                print(f"processing group annotations of video number {dirpath.split('/')[-1]} .....")
 
                 target_frames = self._load_group_annotations(
                     group_annotation_path=group_annotation_path, 
