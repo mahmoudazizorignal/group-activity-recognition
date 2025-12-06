@@ -3,10 +3,9 @@ import time
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
-from typing import Optional, Any, Type
+from typing import Optional, Any
 from helpers.config import Settings
 from torch.utils.data import DataLoader
-from torchmetrics import Accuracy, F1Score
 from models.lr import LRProviderFactory
 from models.lr.LREnums import LREnums
 from models.baselines import BaselinesProviderFactory
@@ -19,12 +18,13 @@ class TrainerController:
     def __init__(self, 
                  baseline: BaselinesEnums,
                  lr_scheduler: LREnums,
-                 num_classes: int,
                  settings: Settings,
                  train_loader: DataLoader, 
                  val_loader: DataLoader, 
                  test_loader: Optional[DataLoader] = None,
                  resnet_pretrained: bool = True,
+                 resnet_finetuned: Optional[nn.Module] = None,
+                 compile: bool = True,
                  tensorboard_track: bool = True,):
 
         self.settings = settings
@@ -49,71 +49,37 @@ class TrainerController:
         # initialize our model
         self.model = BaselinesProviderFactory(
             settings=settings
-        ).create(provider=baseline, resnet_pretrained=resnet_pretrained)
+        ).create(provider=baseline, resnet_pretrained=resnet_pretrained, resnet_finetuned=resnet_finetuned)
 
         if not self.model:
             raise TypeError("invalid model type!")
         
-        # only dump the input and the model details the first time we use a model type
-        if tensorboard_track and not os.path.exists(f"{self.model.tensorboard_path}/model"):
-
-            with SummaryWriter(log_dir=f"{self.model.tensorboard_path}/model") as writer:
-                
-                # getting one batch of the data for visualization
-                x_batch, y_batch = next(iter(self.train_loader))
-                x_batch = x_batch.view(self.model.input_size)
-                y_batch = y_batch.view(self.model.target_size)
-
-                # visualize the structure of the model and its input
-                writer.add_graph(
-                    model=self.model, 
-                    input_to_model=(x_batch, y_batch),
-                )
-
-                # visualizing images in the batch
-                writer.add_images(
-                    tag="batch_example",
-                    img_tensor=x_batch,
-                    global_step=0,
-                )
-      
         # move the model to the specified device  
         self.model.to(self.settings.DEVICE)
         
-        # compile the model
-        self.model.compile()
-        
+        if compile:
+            # compile the model
+            self.model.compile()
+
         # define the optimizer
         self.optimizer = torch.optim.AdamW(self.model.parameters(), fused=torch.cuda.is_available())
 
-        # settings our evaluation metrics
-        self.accuracy = Accuracy(
-            task="multiclass", 
-            num_classes=num_classes
-        ).to(self.settings.DEVICE)
-        
-        self.f1_score = F1Score(
-            task="multiclass", 
-            num_classes=num_classes, 
-            average="weighted"
-        ).to(self.settings.DEVICE)
-        
-        
-    def eval_model(self, eval_loader: DataLoader) -> tuple[float | Any, float | Any, float | Any]:
+    
+    def eval_model(self, eval_loader: DataLoader) -> tuple[float, float, float]:
+
         # set the model to evaluation mode
         self.model.eval()
         with torch.inference_mode():
+            
             running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
-            for xb, yb, in tqdm(eval_loader):
-                xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
-                xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
-                
+            for batch in tqdm(eval_loader):
+            
                 with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
-                    logits, loss = self.model(xb, yb)
+                    _, loss, acc, f1 = self.model(batch)
                 
                 running_loss += loss.item()
-                running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
-                running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
+                running_acc  += acc.item()
+                running_f1   += f1.item()
             
             running_loss /= len(eval_loader)
             running_acc  /= len(eval_loader)
@@ -139,15 +105,16 @@ class TrainerController:
         for epoch in range(self.settings.NUM_EPOCHS):
 
             running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
-            for i, (xb, yb) in enumerate(tqdm(self.train_loader)):
-
-                # move the tensors to the right device and reshape
-                xb, yb = xb.to(self.settings.DEVICE), yb.to(self.settings.DEVICE)
-                xb, yb = xb.view(self.model.input_size), yb.view(self.model.target_size)
-
+            for i, batch in enumerate(tqdm(self.train_loader)):
+                
                 # do the forward path
                 with torch.autocast(device_type=self.settings.DEVICE, dtype=torch.bfloat16):
-                    logits, loss = self.model(xb, yb)
+                    _, loss, acc, f1 = self.model(batch)
+
+                # accumulate loss, accuracy, and f1 values on each mini batch
+                running_loss += loss.item()
+                running_acc  += acc.item()
+                running_f1   += f1.item()
 
                 # divide the loss by the number of gradient accumulation steps
                 loss /= self.settings.GRAD_ACCUM_STEPS
@@ -159,10 +126,12 @@ class TrainerController:
                 loss.backward()
 
                 if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0:
+
                     # getting the updated learning rate
                     lr = self.scheduler.get_lr(step)
 
                     if self.tensorboard_track:
+
                         # tracking learning rate values
                         writer.add_scalar(
                             tag="lr_scheduler", 
@@ -184,24 +153,9 @@ class TrainerController:
                     for param in self.optimizer.param_groups:
                         param["lr"] = lr
 
-
-                    # tracking the loss of each evaluation interval in the val
-                    if (step + 1) % self.settings.EVAL_INTERVALS == 0 and i + 1 != len(self.train_loader):
-                        val_accum_loss, _, _ = self.eval_model(self.val_loader)
-                        
-                        if self.tensorboard_track:
-                            writer.add_scalar(
-                                tag="grad_accum_steps/val/loss", 
-                                scalar_value=val_accum_loss, 
-                                global_step=step,
-                            )
-
-                    # increment number of gradient accumulation steps done
-                    step += 1
-
                     # tracking the ditributions of the gradients in the model
                     for name, param in self.model.named_parameters():
-                        if self.tensorboard_track and param is not None:
+                        if self.tensorboard_track and param is not None and param.grad is not None:
                             writer.add_histogram(
                                 tag=f"{name}.grad",
                                 values=param.grad,
@@ -217,10 +171,31 @@ class TrainerController:
                     # zeroing all the gradients
                     self.optimizer.zero_grad()    
 
-                # accumulate loss, accuracy, and f1 values on each mini batch
-                running_loss += loss.item()
-                running_acc  += self.accuracy(logits.argmax(dim=1), yb).item()
-                running_f1   += self.f1_score(logits.argmax(dim=1), yb).item()
+                    # increment number of gradient accumulation steps done
+                    step += 1
+
+                    # tracking the loss of each evaluation interval in the val
+                    if step % self.settings.EVAL_INTERVALS == 0:
+                        val_accum_loss, _, _ = self.eval_model(self.val_loader)
+                        
+                        if self.tensorboard_track:
+                            writer.add_scalar(
+                                tag="grad_accum_steps/val/loss", 
+                                scalar_value=val_accum_loss, 
+                                global_step=step,
+                            )
+
+            # handle any remaining gradients after the loop
+            if (len(self.train_loader) % self.settings.GRAD_ACCUM_STEPS) != 0:
+                
+                lr = self.scheduler.get_lr(step)
+                for param in self.optimizer.param_groups:
+                    param["lr"] = lr
+                
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                step += 1
 
             # averaging our values by the number of mini batches
             running_loss /= len(self.train_loader)
@@ -244,21 +219,26 @@ class TrainerController:
 
         # test model if a test set was given
         if self.test_loader is not None:
-            test_loss, test_acc, test_f1 = self.eval_model(eval_loader=self.test_loader)
 
+            test_loss, test_acc, test_f1 = self.eval_model(eval_loader=self.test_loader)
+            print(f"test_loss: {test_loss:.4f}, test_acc: {test_acc:.4f}, test_f1: {test_f1:.4f}")
+            
             if self.tensorboard_track:
+
                 # track metrics for each experiment
                 writer.add_scalar(tag="loss/test", scalar_value=test_loss, global_step=0)
                 writer.add_scalar(tag="accuracy/test", scalar_value=test_acc, global_step=0)
                 writer.add_scalar(tag="f1_score/test", scalar_value=test_f1, global_step=0)
 
         if self.tensorboard_track:
+
             # save all the hyperparameters to the tensorbaord
             hparam_dict = {
                 key: value
                 for key, value in self.settings.model_dump().items()
                 if (not isinstance(value, dict)) and (not isinstance(value, list))
             }
+
             writer.add_hparams(
                 hparam_dict=hparam_dict,
                 metric_dict={
