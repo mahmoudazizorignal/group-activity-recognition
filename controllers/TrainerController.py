@@ -146,9 +146,6 @@ class TrainerController:
                             global_step=step,
                         )
 
-                    # zeroing loss accumulation after using it
-                    loss_accum = 0.0
-
                     # updating our learning rate
                     for param in self.optimizer.param_groups:
                         param["lr"] = lr
@@ -176,7 +173,9 @@ class TrainerController:
 
                     # tracking the loss of each evaluation interval in the val
                     if step % self.settings.EVAL_INTERVALS == 0:
-                        val_accum_loss, _, _ = self.eval_model(self.val_loader)
+                        val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
+                        
+                        print(f"Step {step}: train_loss: {loss_accum:.4f}, val_loss: {val_accum_loss:.4f} val_acc: {val_accum_acc:.3f}, val_f1: {val_accum_f1:.3f}")
                         
                         if self.tensorboard_track:
                             writer.add_scalar(
@@ -184,6 +183,9 @@ class TrainerController:
                                 scalar_value=val_accum_loss, 
                                 global_step=step,
                             )
+                    
+                    # zeroing loss accumulation after using it
+                    loss_accum = 0.0
 
             # handle any remaining gradients after the loop
             if (len(self.train_loader) % self.settings.GRAD_ACCUM_STEPS) != 0:
