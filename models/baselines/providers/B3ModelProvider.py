@@ -17,9 +17,19 @@ class B3ModelProvider(BaselinesInterface):
             resnet_finetuned = resnet_finetuned,
         )
 
-        # define the fully connected layer
-        self.fc = nn.Linear(in_features=2048, out_features=settings.GROUP_ACTION_CNT)
-        torch.nn.init.normal_(self.fc.weight, mean=0.0, std=0.02)
+        # define the classifier architecture
+        self.pooler = nn.AdaptiveMaxPool1d(output_size=1)
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features=2048, out_features=1024),
+            nn.BatchNorm1d(num_features=1024),
+            nn.ReLU(),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
+            nn.Linear(in_features=1024, out_features=512),
+            nn.BatchNorm1d(num_features=512),
+            nn.ReLU(),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
+            nn.Linear(in_features=512, out_features=settings.GROUP_ACTION_CNT)
+        )
         
         # define the tensorboard path
         self.tensorboard_path = os.path.join(
@@ -66,10 +76,10 @@ class B3ModelProvider(BaselinesInterface):
         )
         
         # max pool the features across all players: (B, P, 2048) => (B, 2048)
-        x, _ = torch.max(x, dim=1)
+        x = self.pooler(x.permute(0, 2, 1)).squeeze()
 
         # get the logits
-        logits = self.fc(x)
+        logits = self.classifier(x)
         
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         loss = F.cross_entropy(logits, y.view(-1))
