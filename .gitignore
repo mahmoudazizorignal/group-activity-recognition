@@ -228,6 +228,7 @@ volleyball/
 
 # models checkpoints
 checkpoints/
+runs/
 
 *.viminfo
 *.Identifier
