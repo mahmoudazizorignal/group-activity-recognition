@@ -150,15 +150,6 @@ class TrainerController:
                     for param in self.optimizer.param_groups:
                         param["lr"] = lr
 
-                    # tracking the ditributions of the gradients in the model
-                    for name, param in self.model.named_parameters():
-                        if self.tensorboard_track and param is not None and param.grad is not None:
-                            writer.add_histogram(
-                                tag=f"{name}.grad",
-                                values=param.grad,
-                                global_step=step,
-                            )
-
                     # cliping gradients to avoid exploading gradients
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
@@ -174,7 +165,7 @@ class TrainerController:
                     # tracking the loss of each evaluation interval in the val
                     if step % self.settings.EVAL_INTERVALS == 0:
                         val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
-                        
+                        torch.cuda.empty_cache()
                         print(f"Step {step}: train_loss: {loss_accum:.4f}, val_loss: {val_accum_loss:.4f} val_acc: {val_accum_acc:.3f}, val_f1: {val_accum_f1:.3f}")
                         
                         if self.tensorboard_track:
