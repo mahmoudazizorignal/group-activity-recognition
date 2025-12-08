@@ -20,14 +20,16 @@ class PersonModelProvider(BaselinesInterface):
         )
 
         # define the architecture of b1-model
-        self.model = nn.ModuleDict(dict(
-            resnet=self.resnet,
-            head=nn.Linear(in_features=2048, out_features=self.settings.PLAYER_ACTION_CNT)
-        ))
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features=2048, out_features=1024),
+            nn.BatchNorm1d(num_features=1024),
+            nn.ReLU(),
+            nn.Linear(in_features=1024, out_features=512),
+            nn.BatchNorm1d(num_features=512),
+            nn.ReLU(),
+            nn.Linear(in_features=512, out_features=settings.PLAYER_ACTION_CNT)
+        )
         
-        # initialize the new head of the model
-        torch.nn.init.normal_(self.model.head.weight, mean=0.0, std=0.02)
-
         # settings our evaluation metrics
         self.accuracy = Accuracy(
             task="multiclass", 
@@ -54,7 +56,8 @@ class PersonModelProvider(BaselinesInterface):
         y = y.view(-1,)
 
         # get the logits
-        logits = self.model.head(self.model.resnet(x).squeeze())
+        x = self.resnet(x).squeeze()
+        logits = self.classifier(x)
 
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         loss = F.cross_entropy(logits, y)
