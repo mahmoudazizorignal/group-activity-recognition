@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     NO_LSTM_LAYERS: int
     NO_LSTM_HIDDEN_UNITS: int
     LSTM_DROPOUT_RATE: float
-
+    HEAD_DROPOUT_RATE: float
+    
     class Config:
         env_file = ".env"
 
