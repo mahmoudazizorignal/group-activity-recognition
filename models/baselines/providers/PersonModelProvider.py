@@ -19,14 +19,16 @@ class PersonModelProvider(BaselinesInterface):
             TensorBoardEnums.PERSON_TENSORBOARD_DIR.value,
         )
 
-        # define the architecture of b1-model
+        # define the architecture of the classifier
         self.classifier = nn.Sequential(
             nn.Linear(in_features=2048, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
             nn.Linear(in_features=1024, out_features=512),
             nn.BatchNorm1d(num_features=512),
             nn.ReLU(),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
             nn.Linear(in_features=512, out_features=settings.PLAYER_ACTION_CNT)
         )
         
@@ -56,9 +58,8 @@ class PersonModelProvider(BaselinesInterface):
         y = y.view(-1,)
 
         # get the logits
-        x = self.resnet(x).squeeze()
-        logits = self.classifier(x)
-
+        logits = self.classifier(self.resnet(x).squeeze())
+        
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         loss = F.cross_entropy(logits, y)
         acc  = self.accuracy(logits.argmax(dim=1), y)
