@@ -66,7 +66,7 @@ class B4ModelProvider(BaselinesInterface):
 
         # do the forward path
         batch_size = x.shape[0]
-        x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
+        x = x.view(batch_size * self.settings.FRAME_CNT, self.settings.C, self.settings.H, self.settings.W)
         x1 = self.resnet(x).squeeze() # (BATCH_SIZE * FRAME_CNT, 2048)
         x1 = x1.view(batch_size, self.settings.FRAME_CNT, 2048) # (BATCH_SIZE, FRAME_CNT, 2048)
         x2, (_, _) = self.lstm(x1) # (BATCH_SIZE, FRAME_CNT, NO_LSTM_HIDDEN_UNITS)
