@@ -56,24 +56,18 @@ class B3ModelProvider(BaselinesInterface):
         # get the input and the group annotations only
         x, _, y = batch
         
-        # swap the frame count and player count
-        x = x.permute(0, 2, 1, 3, 4, 5).contiguous().view(
-            -1, 
-            self.settings.PLAYER_CNT, 
-            self.settings.C,
-            self.settings.H,
-            self.settings.W,
-        )
-
         # move the right device
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
+        
+        # swap the frame count and player count
+        x = x.permute(0, 2, 1, 3, 4, 5)
+        x = x.reshape(-1, self.settings.PLAYER_CNT, self.settings.C, self.settings.H, self.settings.W)
 
         # extract the feature representations for person crops
-        x = self.resnet(x.view(-1, self.settings.C, self.settings.H, self.settings.W)).squeeze().view(
-            x.shape[0],
-            self.settings.PLAYER_CNT, 
-            -1
-        )
+        batch_size = x.shape[0]
+        x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
+        x = self.resnet(x)
+        x = x.view(batch_size, self.settings.PLAYER_CNT, 2048)
         
         # max pool the features across all players: (B, P, 2048) => (B, 2048)
         x = self.pooler(x.permute(0, 2, 1)).squeeze()
@@ -82,8 +76,9 @@ class B3ModelProvider(BaselinesInterface):
         logits = self.classifier(x)
         
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
-        loss = F.cross_entropy(logits, y.view(-1))
-        acc  = self.accuracy(logits.argmax(dim=1), y.view(-1))
-        f1   = self.f1_score(logits.argmax(dim=1), y.view(-1))
+        loss  = F.cross_entropy(logits, y.view(-1))
+        preds = logits.argmax(dim=1)
+        acc   = self.accuracy(preds, y.view(-1))
+        f1    = self.f1_score(preds, y.view(-1))
         
         return logits, loss, acc, f1
