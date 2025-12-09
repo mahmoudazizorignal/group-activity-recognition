@@ -27,7 +27,19 @@ class B4ModelProvider(BaselinesInterface):
             num_layers=settings.NO_LSTM_LAYERS,
             batch_first=True,
             dropout=settings.LSTM_DROPOUT_RATE,
-            proj_size=settings.GROUP_ACTION_CNT,
+        )
+        
+        # define classifier component
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS, out_features=1024),
+            nn.BatchNorm1d(num_features=1024),
+            nn.ReLU(),
+            nn.Dropout(p=settings.LSTM_DROPOUT_RATE),
+            nn.Linear(in_features=1024, out_features=512),
+            nn.BatchNorm1d(num_features=512),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.Linear(in_features=512, out_features=settings.GROUP_ACTION_CNT),
         )
 
         # settings our evaluation metrics
@@ -48,17 +60,20 @@ class B4ModelProvider(BaselinesInterface):
 
     def forward(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # get the input and output of the batch and move it to the right device
-        x, y = batch # x => (Batch_Size, FRAME_CNT, C, H, W), y => (Batch_Size, FRAME_CNT,)
+        x, y = batch # x => (BATCH_SIZE, FRAME_CNT, C, H, W), y => (BATCH_SIZE, FRAME_CNT,)
+        y = y[:, -1] # we only need one frame annotation per clip
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
 
         # do the forward path
-        x = self.resnet(x.view(-1, self.settings.C, self.settings.H, self.settings.W)).squeeze()
-        logits, (_, _) = self.lstm(x.view(-1, self.settings.FRAME_CNT, 2048))
+        batch_size = x.shape[0]
+        x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
+        x1 = self.resnet(x).squeeze() # (BATCH_SIZE * FRAME_CNT, 2048)
+        x1 = x1.view(batch_size, self.settings.FRAME_CNT, 2048) # (BATCH_SIZE, FRAME_CNT, 2048)
+        x2, (_, _) = self.lstm(x1) # (BATCH_SIZE, FRAME_CNT, NO_LSTM_HIDDEN_UNITS)
+        x = torch.concat([x1, x2], dim=2) # (BATCH_SIZE, FRAME_CNT, 2048 + NO_LSTM_HIDDEN_UNITS)
+        x = x[:, -1, :] # (BATCH_SIZE, 2048 + NO_LSTM_HIDDEN_UNITS)
+        logits = self.classifier(x) # (BATCH_SIZE, GROUP_ACTION_CNT)
         
-        # we only concerned with the final hidden state for instance
-        logits = logits[:, -1, :] 
-        y = y[:, -1]
-
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         loss = F.cross_entropy(logits, y)
         acc  = self.accuracy(logits.argmax(dim=1), y)
