@@ -1,5 +1,6 @@
 import os
 import time
+import copy
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
@@ -100,8 +101,9 @@ class TrainerController:
             writer = SummaryWriter(log_dir=f"{self.model.tensorboard_path}/run_{time.strftime('%Y%m%d-%H%M%S')}")
         
         step = 0
+        best_model = None
         running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
-        val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
+        best_loss, val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0, 0.0
         for epoch in range(self.settings.NUM_EPOCHS):
 
             running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
@@ -150,6 +152,8 @@ class TrainerController:
                     if step % self.settings.EVAL_INTERVALS == 0:
                         val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
                         print(f"step {step}: train_loss: {loss_accum:.4f}, val_loss: {val_accum_loss:.4f} val_acc: {val_accum_acc:.3f}, val_f1: {val_accum_f1:.3f}")
+                        if best_model is None or best_loss > val_accum_loss:
+                            best_model = copy.deepcopy(self.model).cpu()
                     else:
                         print(f"step {step}: train_loss: {loss_accum:.4f}")
                         
@@ -228,4 +232,4 @@ class TrainerController:
 
             writer.close()
 
-        return self.model
+        return best_model
