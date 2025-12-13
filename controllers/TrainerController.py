@@ -153,6 +153,7 @@ class TrainerController:
                         val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
                         print(f"step {step}: train_loss: {loss_accum:.4f}, val_loss: {val_accum_loss:.4f} val_acc: {val_accum_acc:.3f}, val_f1: {val_accum_f1:.3f}")
                         if best_model is None or best_loss > val_accum_loss:
+                            best_loss = val_accum_loss
                             best_model = copy.deepcopy(self.model).cpu()
                     else:
                         print(f"step {step}: train_loss: {loss_accum:.4f}")
