@@ -1,7 +1,9 @@
 import torch.nn as nn
 from typing import Optional
 from helpers.config import Settings
-from models.baselines.providers import B1ModelProvider, B3ModelProvider, B4ModelProvider, PersonModelProvider
+from models.baselines.providers import (B1ModelProvider, B3ModelProvider, 
+                                        B4ModelProvider, PersonModelProvider,
+                                        B5ModelProvider)
 from models.baselines.BaselinesEnums import BaselinesEnums
 
 class BaselinesProviderFactory:
@@ -25,6 +27,12 @@ class BaselinesProviderFactory:
 
         elif provider.name == BaselinesEnums.B4_MODEL.name:
             return B4ModelProvider(
+                settings=self.settings,
+                resnet_pretrained=resnet_pretrained,
+            )
+        
+        elif provider.name == BaselinesEnums.B5_MODEL.name:
+            return B5ModelProvider(
                 settings=self.settings,
                 resnet_pretrained=resnet_pretrained,
             )
