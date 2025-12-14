@@ -34,11 +34,11 @@ class B4ModelProvider(BaselinesInterface):
             nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
-            nn.Dropout(p=settings.LSTM_DROPOUT_RATE),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
             nn.Linear(in_features=1024, out_features=512),
             nn.BatchNorm1d(num_features=512),
             nn.ReLU(),
-            nn.Dropout(p=settings.LSTM_DROPOUT_RATE),
+            nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
             nn.Linear(in_features=512, out_features=settings.GROUP_ACTION_CNT),
         )
 
