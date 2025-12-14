@@ -11,7 +11,7 @@ from models.baselines.BaselinesEnums import TensorBoardEnums
 class B1ModelProvider(BaselinesInterface):
     
     def __init__(self, settings: Settings, resnet_pretrained: bool):
-        super().__init__(settings = settings,resnet_pretrained=resnet_pretrained, resnet_finetuned=None)
+        super().__init__(settings = settings,resnet_pretrained=resnet_pretrained, base_finetuned=None)
         
         # define the tensorboard path
         self.tensorboard_path = os.path.join(

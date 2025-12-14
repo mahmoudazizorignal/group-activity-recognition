@@ -1,5 +1,5 @@
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Union
 from helpers.config import Settings
 from models.baselines.providers import (B1ModelProvider, B3ModelProvider, 
                                         B4ModelProvider, PersonModelProvider,
@@ -11,7 +11,13 @@ class BaselinesProviderFactory:
     def __init__(self, settings: Settings):
         self.settings = settings
     
-    def create(self, provider: BaselinesEnums, resnet_pretrained: bool, resnet_finetuned: Optional[nn.Module] = None):
+    def create(
+        self, 
+        provider: BaselinesEnums, 
+        resnet_pretrained: bool, 
+        base_finetuned: Optional[Union[PersonModelProvider, nn.Module]] = None,
+        temporal: bool = True,
+    ):
         if provider.name == BaselinesEnums.B1_MODEL.name:
             return B1ModelProvider(
                 settings=self.settings,
@@ -21,8 +27,7 @@ class BaselinesProviderFactory:
         elif provider.name == BaselinesEnums.B3_MODEL.name:
             return B3ModelProvider(
                 settings=self.settings,
-                resnet_pretrained=resnet_pretrained,
-                resnet_finetuned=resnet_finetuned,
+                base_finetuned=base_finetuned,
             )
 
         elif provider.name == BaselinesEnums.B4_MODEL.name:
@@ -34,11 +39,12 @@ class BaselinesProviderFactory:
         elif provider.name == BaselinesEnums.B5_MODEL.name:
             return B5ModelProvider(
                 settings=self.settings,
-                resnet_pretrained=resnet_pretrained,
+                base_finetuned=base_finetuned,
             )
         
         elif provider.name == BaselinesEnums.PERSON_MODEL.name:
             return PersonModelProvider(
                 settings=self.settings,
                 resnet_pretrained=resnet_pretrained,
+                temporal=temporal,
             )

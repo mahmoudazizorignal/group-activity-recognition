@@ -4,21 +4,25 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics import Accuracy, F1Score
 from helpers.config import Settings
-from typing import Optional, Any, Tuple
+from typing import Optional, Union, Tuple
+from models.baselines.providers import PersonModelProvider
 from models.baselines.BaselinesInterface import BaselinesInterface
 from models.baselines.BaselinesEnums import TensorBoardEnums
 
 class B3ModelProvider(BaselinesInterface):
     
-    def __init__(self, settings: Settings, resnet_pretrained: bool, resnet_finetuned: Optional[nn.Module] = None):
+    def __init__(self, settings: Settings, base_finetuned: PersonModelProvider):
         super().__init__(
             settings = settings, 
-            resnet_pretrained = resnet_pretrained, 
-            resnet_finetuned = resnet_finetuned,
+            resnet_pretrained = False, 
+            base_finetuned = base_finetuned,
         )
-
-        # define the classifier architecture
-        self.pooler = nn.AdaptiveMaxPool1d(output_size=1)
+        self.base.classifier = None
+            
+        # define the max pooling layer
+        self.pooler = nn.AdaptiveAvgPool2d(output_size=(1, 2048))
+        
+        # define classifier component
         self.classifier = nn.Sequential(
             nn.Linear(in_features=2048, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
@@ -66,11 +70,11 @@ class B3ModelProvider(BaselinesInterface):
         # extract the feature representations for person crops
         batch_size = x.shape[0]
         x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
-        x = self.resnet(x)
+        x = self.base.resnet(x)
         x = x.view(batch_size, self.settings.PLAYER_CNT, 2048)
         
         # max pool the features across all players: (B, P, 2048) => (B, 2048)
-        x = self.pooler(x.permute(0, 2, 1)).squeeze()
+        x = self.pooler(x).squeeze()
 
         # get the logits
         logits = self.classifier(x)

@@ -4,27 +4,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics import Accuracy, F1Score
 from helpers.config import Settings
-from typing import Tuple
+from typing import Tuple, Optional, Union
+from models.baselines.providers import PersonModelProvider
 from models.baselines.BaselinesInterface import BaselinesInterface
 from models.baselines.BaselinesEnums import TensorBoardEnums
 
 class B5ModelProvider(BaselinesInterface):
-    def __init__(self, settings: Settings, resnet_pretrained: bool):
-        super().__init__(settings=settings, resnet_pretrained=resnet_pretrained, resnet_finetuned=None)
+    def __init__(self, settings: Settings, base_finetuned: PersonModelProvider):
+        super().__init__(settings=settings, resnet_pretrained=False, base_finetuned=base_finetuned)
+        if isinstance(self.base, PersonModelProvider):
+            self.base.classifier = None
         
         # define the tensorboard path
         self.tensorboard_path = os.path.join(
             self.settings.TENSORBOARD_PATH,
             TensorBoardEnums.B5_TENSORBOARD_DIR.value,
-        )
-        
-        # define lstm component
-        self.lstm = nn.LSTM(
-            input_size=2048,
-            hidden_size=settings.NO_LSTM_HIDDEN_UNITS,
-            num_layers=settings.NO_LSTM_LAYERS,
-            batch_first=True,
-            dropout=settings.LSTM_DROPOUT_RATE,
         )
         
         # define the max pooling layer
@@ -64,24 +58,23 @@ class B5ModelProvider(BaselinesInterface):
         x, _, y = batch # x => (B, P, F, C, H, W), y => (B, F)
         B, P, F, C, H, W = x.shape
         
-        # move the right device
+        # move to the right device
         y = y[:, -1] # we only need the final frame for each clip
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
         
         # extract feature representation for each player in each frame
         x = x.view(B * P * F, C, H, W)
-        x1 = self.resnet(x)
+        x1 = self.base.resnet(x)
+        x1 = x1.view(B * P, F, 2048)
         
         # apply the features to lstm 
-        x1 = x1.view(B * P, F, 2048)
-        x2, (_, _) = self.lstm(x1)
-        x1 = x1.view(B, P, F, 2048)
-        x2 = x2.view(B, P, F, self.settings.NO_LSTM_HIDDEN_UNITS)
-        x = torch.concat([x1, x2], dim=3)
-        x = x[:, :, -1, :] # (B, P, 2048 + H)
+        x2, (_, _) = self.base.lstm(x1) # (B * P, F, H)
+        x = torch.concat([x1, x2], dim=2) # (B * P, F, 2048 + H)
+        x = x[:, -1, :] # (B * P, 2048 + H)
+        x = x.view(B, P, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS)
         
         # max pooling all the players in a clip
-        x = self.pooler(x) # (B, 2048 + H)
+        x = self.pooler(x).view(B, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS) # (B, 2048 + H)
         
         # apply the classifier
         logits = self.classifier(x)
