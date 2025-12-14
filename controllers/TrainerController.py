@@ -24,7 +24,7 @@ class TrainerController:
                  val_loader: DataLoader, 
                  test_loader: Optional[DataLoader] = None,
                  resnet_pretrained: bool = True,
-                 resnet_finetuned: Optional[nn.Module] = None,
+                 base_finetuned: Optional[nn.Module] = None,
                  compile: bool = True,
                  tensorboard_track: bool = True,):
 
@@ -50,7 +50,7 @@ class TrainerController:
         # initialize our model
         self.model = BaselinesProviderFactory(
             settings=settings
-        ).create(provider=baseline, resnet_pretrained=resnet_pretrained, resnet_finetuned=resnet_finetuned)
+        ).create(provider=baseline, resnet_pretrained=resnet_pretrained, base_finetuned=base_finetuned)
 
         if not self.model:
             raise TypeError("invalid model type!")
