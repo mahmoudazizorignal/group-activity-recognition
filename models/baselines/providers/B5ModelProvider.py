@@ -66,7 +66,7 @@ class B5ModelProvider(BaselinesInterface):
         # extract feature representation for each player in each frame
         x = x.view(B * P * Fr, C, H, W)
         x1 = self.base.base(x)
-        x1 = x1.view(B * P, F, 2048)
+        x1 = x1.view(B * P, Fr, 2048)
         
         # apply the features to lstm 
         x2, (_, _) = self.base.lstm(x1) # (B * P, Fr, H)
