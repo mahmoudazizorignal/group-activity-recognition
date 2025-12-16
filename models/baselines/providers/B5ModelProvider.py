@@ -56,21 +56,21 @@ class B5ModelProvider(BaselinesInterface):
     
     def forward(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         # get the input and the group annotations only
-        x, _, y = batch # x => (B, P, F, C, H, W), y => (B, F)
-        B, P, F, C, H, W = x.shape
+        x, _, y = batch # x => (B, P, Fr, C, H, W), y => (B, Fr)
+        B, P, Fr, C, H, W = x.shape
         
         # move to the right device
         y = y[:, -1] # we only need the final frame for each clip
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
         
         # extract feature representation for each player in each frame
-        x = x.view(B * P * F, C, H, W)
+        x = x.view(B * P * Fr, C, H, W)
         x1 = self.base.base(x)
         x1 = x1.view(B * P, F, 2048)
         
         # apply the features to lstm 
-        x2, (_, _) = self.base.lstm(x1) # (B * P, F, H)
-        x = torch.concat([x1, x2], dim=2) # (B * P, F, 2048 + H)
+        x2, (_, _) = self.base.lstm(x1) # (B * P, Fr, H)
+        x = torch.concat([x1, x2], dim=2) # (B * P, Fr, 2048 + H)
         x = x[:, -1, :] # (B * P, 2048 + H)
         x = x.view(B, P, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS)
         
