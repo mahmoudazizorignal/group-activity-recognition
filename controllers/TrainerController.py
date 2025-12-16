@@ -25,6 +25,7 @@ class TrainerController:
                  test_loader: Optional[DataLoader] = None,
                  resnet_pretrained: bool = True,
                  base_finetuned: Optional[nn.Module] = None,
+                 person_temporal: bool = True,
                  compile: bool = True,
                  tensorboard_track: bool = True,):
 
@@ -50,8 +51,15 @@ class TrainerController:
         # initialize our model
         self.model = BaselinesProviderFactory(
             settings=settings
-        ).create(provider=baseline, resnet_pretrained=resnet_pretrained, base_finetuned=base_finetuned)
-
+        ).create(
+            provider=baseline, 
+            resnet_pretrained=resnet_pretrained, 
+            base_finetuned=base_finetuned, 
+            temporal=person_temporal
+        )
+        self.best_model = None
+        self.best_f1 = 0.0
+        
         if not self.model:
             raise TypeError("invalid model type!")
         
@@ -101,9 +109,8 @@ class TrainerController:
             writer = SummaryWriter(log_dir=f"{self.model.tensorboard_path}/run_{time.strftime('%Y%m%d-%H%M%S')}")
         
         step = 0
-        best_model = None
         running_loss, running_acc, running_f1 = 0.0, 0.0, 0.0
-        best_loss, val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0, 0.0
+        val_loss, val_acc, val_f1 = 0.0, 0.0, 0.0
         for epoch in range(self.settings.NUM_EPOCHS):
 
             running_loss, loss_accum, running_acc, running_f1 = 0.0, 0.0, 0.0, 0.0
@@ -152,9 +159,9 @@ class TrainerController:
                     if step % self.settings.EVAL_INTERVALS == 0:
                         val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
                         print(f"step {step}: train_loss: {loss_accum:.4f}, val_loss: {val_accum_loss:.4f} val_acc: {val_accum_acc:.3f}, val_f1: {val_accum_f1:.3f}")
-                        if best_model is None or best_loss > val_accum_loss:
-                            best_loss = val_accum_loss
-                            best_model = copy.deepcopy(self.model).cpu()
+                        if self.best_model is None or self.best_f1 < val_accum_f1:
+                            self.best_f1 = val_accum_f1
+                            self.best_model = copy.deepcopy(self.model).cpu()
                     else:
                         print(f"step {step}: train_loss: {loss_accum:.4f}")
                         
@@ -183,7 +190,10 @@ class TrainerController:
             running_f1   /= len(self.train_loader)
 
             # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
-            # val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
+            val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
+            if self.best_model is None or self.best_f1 < val_f1:
+                self.best_f1 = val_f1
+                self.best_model = copy.deepcopy(self.model).cpu()
 
             if self.tensorboard_track:
                 # tracking losses and metrics values
@@ -195,7 +205,7 @@ class TrainerController:
                 writer.add_scalar(tag="f1_score/val", scalar_value=val_f1, global_step=epoch)
 
 
-            # print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
+            print(f"Epoch [{epoch + 1}/{self.settings.NUM_EPOCHS}]: train_loss: {running_loss:.4f}, train_acc: {running_acc:.3f}, train_f1: {running_f1:.3f}, val_loss: {val_loss:.4f} val_acc: {val_acc:.3f}, val_f1: {val_f1:.3f}")
 
         # test model if a test set was given
         if self.test_loader is not None:
@@ -233,4 +243,4 @@ class TrainerController:
 
             writer.close()
 
-        return best_model
+        return self.best_model
