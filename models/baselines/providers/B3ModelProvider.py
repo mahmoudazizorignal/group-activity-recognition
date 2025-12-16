@@ -70,7 +70,7 @@ class B3ModelProvider(BaselinesInterface):
         # extract the feature representations for person crops
         batch_size = x.shape[0]
         x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
-        x = self.base.resnet(x)
+        x = self.base.base(x)
         x = x.view(batch_size, self.settings.PLAYER_CNT, 2048)
         
         # max pool the features across all players: (B, P, 2048) => (B, 2048)
