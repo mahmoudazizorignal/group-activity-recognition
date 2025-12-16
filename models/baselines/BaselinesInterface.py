@@ -14,7 +14,7 @@ class BaselinesInterface(ABC, nn.Module):
         if base_finetuned:
             self.base = base_finetuned
             
-            # freeze the resnet-50 because its already finetuned
+            # freeze the base model because its already finetuned
             for param in self.base.parameters():
                 param.requires_grad = False
                 
