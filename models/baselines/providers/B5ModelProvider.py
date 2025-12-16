@@ -12,7 +12,8 @@ from models.baselines.BaselinesEnums import TensorBoardEnums
 class B5ModelProvider(BaselinesInterface):
     def __init__(self, settings: Settings, base_finetuned: PersonModelProvider):
         super().__init__(settings=settings, resnet_pretrained=False, base_finetuned=base_finetuned)
-        if isinstance(self.base, PersonModelProvider):
+        
+        if hasattr(self.base, "classifier"):
             self.base.classifier = None
         
         # define the tensorboard path
