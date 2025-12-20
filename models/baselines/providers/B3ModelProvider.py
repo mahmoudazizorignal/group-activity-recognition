@@ -4,10 +4,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics import Accuracy, F1Score
 from helpers.config import Settings
-from typing import Optional, Union, Tuple
+from typing import Tuple, List
 from models.baselines.providers import PersonModelProvider
 from models.baselines.BaselinesInterface import BaselinesInterface
-from models.baselines.BaselinesEnums import TensorBoardEnums
+from models.baselines.BaselinesEnums import TensorBoardEnums, BaselinesEnums
 
 class B3ModelProvider(BaselinesInterface):
     
@@ -17,7 +17,10 @@ class B3ModelProvider(BaselinesInterface):
             resnet_pretrained = False, 
             base_finetuned = base_finetuned,
         )
-        self.base.classifier = None
+        # we only need the feature extractor that fine-tuned on person-level images
+        assert not hasattr(self.base, "lstm"), f"the base model for {BaselinesEnums.B3_MODEL} cannot be temporal"
+        if hasattr(self.base, "classifier"):
+            self.base.classifier = None
             
         # define the max pooling layer
         self.pooler = nn.AdaptiveAvgPool2d(output_size=(1, 2048))
@@ -56,7 +59,9 @@ class B3ModelProvider(BaselinesInterface):
         self.accuracy.forward = torch.compiler.disable(self.accuracy.forward)
         self.f1_score.forward = torch.compiler.disable(self.f1_score.forward)
 
-    def forward(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, 
+                batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
         # get the input and the group annotations only
         x, _, y = batch
         
@@ -70,7 +75,7 @@ class B3ModelProvider(BaselinesInterface):
         # extract the feature representations for person crops
         batch_size = x.shape[0]
         x = x.view(-1, self.settings.C, self.settings.H, self.settings.W)
-        x = self.base.base(x)
+        x = self.base.resnet(x)
         x = x.view(batch_size, self.settings.PLAYER_CNT, 2048)
         
         # max pool the features across all players: (B, P, 2048) => (B, 2048)
@@ -85,4 +90,4 @@ class B3ModelProvider(BaselinesInterface):
         acc   = self.accuracy(preds, y.view(-1))
         f1    = self.f1_score(preds, y.view(-1))
         
-        return logits, loss, acc, f1
+        return [logits], [loss], [acc], [f1]

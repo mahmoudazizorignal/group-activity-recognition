@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics import Accuracy, F1Score
 from helpers.config import Settings
-from typing import Tuple
+from typing import Tuple, Union, List
 from models.baselines.BaselinesInterface import BaselinesInterface
 from models.baselines.BaselinesEnums import TensorBoardEnums
 
@@ -18,21 +18,20 @@ class PersonModelProvider(BaselinesInterface):
             self.settings.TENSORBOARD_PATH,
             TensorBoardEnums.PERSON_TENSORBOARD_DIR.value,
         )
-        self.lstm = None
         
         if temporal:
             # define lstm component
             self.lstm = nn.LSTM(
                 input_size=2048,
-                hidden_size=settings.NO_LSTM_HIDDEN_UNITS,
-                num_layers=settings.NO_LSTM_LAYERS,
+                hidden_size=settings.NO_LSTM_HIDDEN_UNITS1,
+                num_layers=settings.NO_LSTM_LAYERS1,
                 batch_first=True,
-                dropout=settings.LSTM_DROPOUT_RATE,
+                dropout=settings.LSTM_DROPOUT_RATE1,
             )
 
         # define the architecture of the classifier
         self.classifier = nn.Sequential(
-            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS * temporal, out_features=1024),
+            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS1 * temporal, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
             nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
@@ -59,7 +58,9 @@ class PersonModelProvider(BaselinesInterface):
         self.accuracy.forward = torch.compiler.disable(self.accuracy.forward)
         self.f1_score.forward = torch.compiler.disable(self.f1_score.forward)
 
-    def forward(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, 
+                batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+        ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
         # get the input and the group annotations only
         x, y, _ = batch # x => (B, P, F, C, H, W), y => (B, P, F)
         B, P, Fr, C, H, W = x.shape
@@ -70,14 +71,14 @@ class PersonModelProvider(BaselinesInterface):
         
         # extract feature representation for each player in each frame
         x = x.view(B * P * Fr, C, H, W)
-        x1 = self.base(x)
+        x1 = self.resnet(x)
         x1 = x1.view(B * P, Fr, 2048)
         
         if self.lstm:
             # apply the features to lstm         
-            x2, (_, _) = self.lstm(x1) # (B * P, F, H)
-            x = torch.concat([x1, x2], dim=2) # (B * P, F, 2048 + H)
-            x = x.view(B * P * Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS)
+            x2, (_, _) = self.lstm(x1) # (B * P, F, Hi1)
+            x = torch.concat([x1, x2], dim=2) # (B * P, F, 2048 + Hi1)
+            x = x.view(B * P * Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1)
         else:
             # else the model is not temporal
             x = x1
@@ -89,4 +90,4 @@ class PersonModelProvider(BaselinesInterface):
         loss = F.cross_entropy(logits, y)
         acc  = self.accuracy(logits.argmax(dim=1), y)
         f1   = self.f1_score(logits.argmax(dim=1), y)
-        return logits, loss, acc, f1
+        return [logits], [loss], [acc], [f1]

@@ -3,7 +3,8 @@ from typing import Optional, Union
 from helpers.config import Settings
 from models.baselines.providers import (B1ModelProvider, B3ModelProvider, 
                                         B4ModelProvider, PersonModelProvider,
-                                        B5ModelProvider)
+                                        B5ModelProvider, B6ModelProvider, 
+                                        B7ModelProvider)
 from models.baselines.BaselinesEnums import BaselinesEnums
 
 class BaselinesProviderFactory:
@@ -15,7 +16,7 @@ class BaselinesProviderFactory:
         self, 
         provider: BaselinesEnums, 
         resnet_pretrained: bool, 
-        base_finetuned: Optional[Union[PersonModelProvider, nn.Module]] = None,
+        base_finetuned: Optional[PersonModelProvider] = None,
         temporal: bool = True,
     ):
         if provider.name == BaselinesEnums.B1_MODEL.name:
@@ -25,6 +26,7 @@ class BaselinesProviderFactory:
             )
         
         elif provider.name == BaselinesEnums.B3_MODEL.name:
+            assert base_finetuned, f"base model cannot be None for {provider.name}"
             return B3ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
@@ -37,11 +39,26 @@ class BaselinesProviderFactory:
             )
         
         elif provider.name == BaselinesEnums.B5_MODEL.name:
+            assert base_finetuned, f"base model cannot be None for {provider.name}"
             return B5ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
             )
         
+        elif provider.name == BaselinesEnums.B6_MODEL.name:
+            assert base_finetuned, f"base model cannot be None for {provider.name}"
+            return B6ModelProvider(
+                settings=self.settings,
+                base_finetuned=base_finetuned,
+            )
+        
+        elif provider.name == BaselinesEnums.B7_MODEL.name:
+            assert base_finetuned, f"base model cannot be None for {provider.name}"
+            return B7ModelProvider(
+                settings=self.settings,
+                base_finetuned=base_finetuned,
+            )
+            
         elif provider.name == BaselinesEnums.PERSON_MODEL.name:
             return PersonModelProvider(
                 settings=self.settings,
