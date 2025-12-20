@@ -52,6 +52,7 @@ class BaselinesProviderFactory:
             return B6ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
+                base_freeze=base_freeze,
             )
         
         elif provider.name == BaselinesEnums.B7_MODEL.name:

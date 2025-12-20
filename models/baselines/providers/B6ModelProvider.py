@@ -11,16 +11,15 @@ from models.baselines.BaselinesEnums import TensorBoardEnums, BaselinesEnums
 
 class B6ModelProvider(BaselinesInterface):
     
-    def __init__(self, settings: Settings, base_finetuned: PersonModelProvider):
+    def __init__(self, settings: Settings, base_finetuned: PersonModelProvider, base_freeze: bool):
         super().__init__(
             settings = settings, 
             resnet_pretrained = False, 
             base_finetuned = base_finetuned,
+            base_freeze=base_freeze,
         )
         # we only need the feature extractor that fine-tuned on person-level images
         assert not hasattr(self.base, "lstm"), f"the base model for {BaselinesEnums.B6_MODEL} cannot be temporal"
-        if hasattr(self.base, "classifier"):
-            self.base.classifier = None
         
         # define the max pooling layer
         self.pooler = nn.AdaptiveAvgPool3d(output_size=(1, settings.FRAME_CNT, 2048))
@@ -72,20 +71,24 @@ class B6ModelProvider(BaselinesInterface):
                 batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
         # get the input and the group annotations only
-        x, _, y = batch # x => (B, P, Fr, C, H, W), y => (B, Fr)
+        x, y1, y2 = batch # x => (B, P, Fr, C, H, W), y1 => (B, P, Fr), y2 => (B, Fr)
         B, P, Fr, C, H, W = x.shape
         
         # move to the right device
-        y = y[:, -1] # we only need the final frame for each clip
-        x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)
+        y1 = y1.view(B * P * Fr,)
+        y2 = y2[:, -1] # we only need the final frame for each clip
+        x, y1, y2 = x.to(self.settings.DEVICE), y1.to(self.settings.DEVICE), y2.to(self.settings.DEVICE)
         
         # extract feature representation for each player in each frame
         x = x.view(B * P * Fr, C, H, W)
         x1 = self.base.resnet(x)
         x1 = x1.view(B, P, Fr, 2048)
         
+        # get the logits of the player activities
+        logits1 = self.base.classifier(x1.view(B * P * Fr, 2048))
+        
         # max pooling all the players in a clip
-        x = self.pooler(x).squeeze()# (B, Fr, 2048)
+        x1 = self.pooler(x1).view(B, Fr, 2048)# (B, Fr, 2048)
         
         # apply the features to lstm 
         x2, (_, _) = self.lstm(x1) # (B, Fr, Hi2)
@@ -93,11 +96,13 @@ class B6ModelProvider(BaselinesInterface):
         x = x[:, -1, :] # (B, 2048 + Hi2)
         
         # apply the classifier
-        logits = self.classifier(x)
+        logits2 = self.classifier(x)
         
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
-        loss = F.cross_entropy(logits, y)
-        acc  = self.accuracy(logits.argmax(dim=1), y)
-        f1   = self.f1_score(logits.argmax(dim=1), y)
+        logits = [logits1, logits2]
+        losses = [F.cross_entropy(logits1, y1), F.cross_entropy(logits2, y2)]
+        accs  = [self.base.accuracy(logits1.argmax(dim=1), y1), self.accuracy(logits2.argmax(dim=1), y2)]
+        f1s  = [self.base.f1_score(logits1.argmax(dim=1), y1), self.f1_score(logits2.argmax(dim=1), y2)]
         
-        return logits, loss, acc, f1
+        
+        return logits, losses, accs, f1s
