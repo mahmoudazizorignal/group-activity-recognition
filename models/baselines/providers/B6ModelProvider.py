@@ -22,7 +22,7 @@ class B6ModelProvider(BaselinesInterface):
         assert not hasattr(self.base, "lstm"), f"the base model for {BaselinesEnums.B6_MODEL} cannot be temporal"
         
         # define the max pooling layer
-        self.pooler = nn.AdaptiveAvgPool3d(output_size=(1, settings.FRAME_CNT, 2048))
+        self.pooler = nn.AdaptiveAvgPool3d(output_size=(1, 2048))
         
         # define lstm component
         self.lstm = nn.LSTM(
@@ -88,7 +88,8 @@ class B6ModelProvider(BaselinesInterface):
         logits1 = self.base.classifier(x1.view(B * P * Fr, 2048))
         
         # max pooling all the players in a clip
-        x1 = self.pooler(x1).view(B, Fr, 2048)# (B, Fr, 2048)
+        x1 = x1.permute(0, 2, 1, 3) # (B, Fr, P, 2048)
+        x1 = self.pooler(x1).view(B, Fr, 2048) # (B, Fr, 2048)
         
         # apply the features to lstm 
         x2, (_, _) = self.lstm(x1) # (B, Fr, Hi2)
