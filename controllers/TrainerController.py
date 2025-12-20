@@ -144,7 +144,7 @@ class TrainerController:
                     loss_accum = [loss_accum[i] + loss[i].item() for i in range(len(loss_accum))]
 
                 # calculate the gradients
-                total_loss = torch.tensor(0.0)
+                total_loss = torch.tensor(0.0).to(self.settings.DEVICE)
                 for lossi in loss:
                     total_loss += lossi
                 total_loss.backward()
