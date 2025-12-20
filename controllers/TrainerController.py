@@ -182,7 +182,7 @@ class TrainerController:
                         print(f"step {step}: train_loss: {loss_accum}")
                         
                     # zeroing loss accumulation after using it
-                    loss_accum = None
+                    loss_accum = [None]
 
             # handle any remaining gradients after the loop
             if (len(self.train_loader) % self.settings.GRAD_ACCUM_STEPS) != 0:
