@@ -201,9 +201,9 @@ class TrainerController:
                 step += 1
 
             # averaging our values by the number of mini batches
-            running_loss = [running_loss[i] / len(train_loader) for i in range(len(running_loss))]
-            running_acc  = [running_acc[i] / len(train_loader) for i in range(len(running_acc))]
-            running_f1   = [running_f1[i] / len(train_loader) for i in range(len(running_f1))]
+            running_loss = [running_loss[i] / len(self.train_loader) for i in range(len(running_loss))]
+            running_acc  = [running_acc[i] / len(self.train_loader) for i in range(len(running_acc))]
+            running_f1   = [running_f1[i] / len(self.train_loader) for i in range(len(running_f1))]
 
             # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
             val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
