@@ -9,6 +9,7 @@ from helpers.config import Settings
 from torch.utils.data import DataLoader
 from models.lr import LRProviderFactory
 from models.lr.LREnums import LREnums
+from models.baselines.providers import PersonModelProvider
 from models.baselines import BaselinesProviderFactory
 from models.baselines.BaselinesEnums import BaselinesEnums
 from torch.utils.tensorboard import SummaryWriter
@@ -24,7 +25,8 @@ class TrainerController:
                  val_loader: DataLoader, 
                  test_loader: Optional[DataLoader] = None,
                  resnet_pretrained: bool = True,
-                 base_finetuned: Optional[nn.Module] = None,
+                 base_finetuned: Optional[PersonModelProvider] = None,
+                 base_freeze: bool = True,
                  person_temporal: bool = True,
                  compile: bool = True,
                  tensorboard_track: bool = True,):
@@ -55,7 +57,8 @@ class TrainerController:
             provider=baseline, 
             resnet_pretrained=resnet_pretrained, 
             base_finetuned=base_finetuned, 
-            temporal=person_temporal
+            base_freeze=base_freeze,
+            temporal=person_temporal,
         )
         self.best_model = None
         self.best_f1 = [0.0]

@@ -17,6 +17,7 @@ class BaselinesProviderFactory:
         provider: BaselinesEnums, 
         resnet_pretrained: bool, 
         base_finetuned: Optional[PersonModelProvider] = None,
+        base_freeze: bool = True,
         temporal: bool = True,
     ):
         if provider.name == BaselinesEnums.B1_MODEL.name:
@@ -43,6 +44,7 @@ class BaselinesProviderFactory:
             return B5ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
+                base_freeze=base_freeze,
             )
         
         elif provider.name == BaselinesEnums.B6_MODEL.name:
