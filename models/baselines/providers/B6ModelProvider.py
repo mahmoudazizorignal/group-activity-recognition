@@ -22,7 +22,7 @@ class B6ModelProvider(BaselinesInterface):
         assert not hasattr(self.base, "lstm"), f"the base model for {BaselinesEnums.B6_MODEL} cannot be temporal"
         
         # define the max pooling layer
-        self.pooler = nn.AdaptiveAvgPool3d(output_size=(1, 2048))
+        self.pooler = nn.AdaptiveAvgPool2d(output_size=(1, 2048))
         
         # define lstm component
         self.lstm = nn.LSTM(
