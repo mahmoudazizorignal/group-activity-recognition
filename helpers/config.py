@@ -43,9 +43,12 @@ class Settings(BaseSettings):
     MAX_STEPS: int
     INITIAL_LR: float
     BETA: float
-    NO_LSTM_LAYERS: int
-    NO_LSTM_HIDDEN_UNITS: int
-    LSTM_DROPOUT_RATE: float
+    NO_LSTM_LAYERS1: int
+    NO_LSTM_HIDDEN_UNITS1: int
+    LSTM_DROPOUT_RATE1: float
+    NO_LSTM_LAYERS2: int
+    NO_LSTM_HIDDEN_UNITS2: int
+    LSTM_DROPOUT_RATE2: float
     HEAD_DROPOUT_RATE: float
     
     class Config:
