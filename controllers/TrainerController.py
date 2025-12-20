@@ -138,7 +138,7 @@ class TrainerController:
                 loss = [lossi / self.settings.GRAD_ACCUM_STEPS for lossi in loss]
 
                 # accumulate the loss
-                if not loss_accum:
+                if not loss_accum[0]:
                     loss_accum = [lossi.item() for lossi in loss]
                 else:
                     loss_accum = [loss_accum[i] + loss[i].item() for i in range(len(loss_accum))]
