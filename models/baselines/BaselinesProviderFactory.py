@@ -60,6 +60,7 @@ class BaselinesProviderFactory:
             return B7ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
+                base_freeze=base_freeze,
             )
             
         elif provider.name == BaselinesEnums.PERSON_MODEL.name:
