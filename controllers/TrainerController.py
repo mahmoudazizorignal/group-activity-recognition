@@ -17,22 +17,26 @@ from torch.utils.tensorboard import SummaryWriter
 
 class TrainerController:
     
-    def __init__(self, 
-                 baseline: BaselinesEnums,
-                 lr_scheduler: LREnums,
-                 settings: Settings,
-                 train_loader: DataLoader, 
-                 val_loader: DataLoader, 
-                 test_loader: Optional[DataLoader] = None,
-                 resnet_pretrained: bool = True,
-                 base_finetuned: Optional[PersonModelProvider] = None,
-                 base_freeze: bool = True,
-                 person_temporal: bool = True,
-                 compile: bool = True,
-                 tensorboard_track: bool = True,):
+    def __init__(
+        self, 
+        baseline: BaselinesEnums,
+        lr_scheduler: LREnums,
+        settings: Settings,
+        train_loader: DataLoader, 
+        val_loader: DataLoader, 
+        test_loader: Optional[DataLoader] = None,
+        resnet_pretrained: bool = True,
+        base_finetuned: Optional[PersonModelProvider] = None,
+        base_freeze: bool = True,
+        person_temporal: bool = True,
+        compile: bool = True,
+        group_only: bool = False,
+        tensorboard_track: bool = True,
+    ):
 
         self.settings = settings
         self.tensorboard_track = tensorboard_track
+        self.group_only = group_only
 
         # setting our dataset loaders
         self.train_loader = train_loader
@@ -149,8 +153,11 @@ class TrainerController:
 
                 # calculate the gradients
                 total_loss = torch.tensor(0.0).to(self.settings.DEVICE)
-                for lossi in loss:
-                    total_loss += lossi
+                if self.group_only:
+                    total_loss += loss[-1]
+                else:
+                    for lossi in loss:
+                        total_loss += lossi
                 total_loss.backward()
 
                 if (i + 1) % self.settings.GRAD_ACCUM_STEPS == 0:
