@@ -35,7 +35,8 @@ class B6ModelProvider(BaselinesInterface):
         
         # define classifier component
         self.classifier = nn.Sequential(
-            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS2, out_features=1024),
+            # nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS2, out_features=1024),
+            nn.Linear(in_features=2048, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
             nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
@@ -93,17 +94,16 @@ class B6ModelProvider(BaselinesInterface):
         
         # apply the features to lstm 
         x2, (_, _) = self.lstm(x1) # (B, Fr, Hi2)
-        x = torch.concat([x1, x2], dim=2) # (B, Fr, 2048 + Hi2)
-        x = x[:, -1, :] # (B, 2048 + Hi2)
+        # x = torch.concat([x1, x2], dim=2) # (B, Fr, 2048 + Hi2)
+        x2 = x2[:, -1, :] # (B, Hi2)
         
         # apply the classifier
-        logits2 = self.classifier(x)
+        logits2 = self.classifier(x2)
         
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         logits = [logits1, logits2]
         losses = [F.cross_entropy(logits1, y1), F.cross_entropy(logits2, y2)]
         accs  = [self.base.accuracy(logits1.argmax(dim=1), y1), self.accuracy(logits2.argmax(dim=1), y2)]
         f1s  = [self.base.f1_score(logits1.argmax(dim=1), y1), self.f1_score(logits2.argmax(dim=1), y2)]
-        
         
         return logits, losses, accs, f1s
