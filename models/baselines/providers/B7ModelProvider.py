@@ -90,7 +90,7 @@ class B7ModelProvider(BaselinesInterface):
         x = torch.concat([x1, x2], dim=2) # (B * P, Fr, 2048 + Hi1)
         
         # get the logits of the player activities
-        logits1 = self.base.classifier(x1.view(B * P * Fr, 2048))
+        logits1 = self.base.classifier(x1.view(B * P * Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1))
         
         # max pooling on all players
         x = x.view(B, P, Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1)
