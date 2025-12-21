@@ -186,7 +186,7 @@ class TrainerController:
                         val_accum_loss, val_accum_acc, val_accum_f1 = self.eval_model(self.val_loader)
                         print(f"step {step}: train_loss: {loss_accum}, val_loss: {val_accum_loss} val_acc: {val_accum_acc}, val_f1: {val_accum_f1}")
                         
-                        if self.best_model is None or self.best_f1[0] < val_accum_f1[0]:
+                        if self.best_model is None or self.best_f1[-1] < val_accum_f1[-1]:
                             self.best_f1 = val_accum_f1
                             self.best_model = copy.deepcopy(self.model).cpu()
                     else:
@@ -218,7 +218,7 @@ class TrainerController:
 
             # caclulate the overall loss, accuracy, and f1 on the eval set at the end of each epoch
             val_loss, val_acc, val_f1 = self.eval_model(self.val_loader)
-            if self.best_model is None or self.best_f1[0] < val_f1[0]:
+            if self.best_model is None or self.best_f1[-1] < val_f1[-1]:
                 self.best_f1 = val_f1
                 self.best_model = copy.deepcopy(self.model).cpu()
 
