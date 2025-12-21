@@ -4,7 +4,7 @@ from helpers.config import Settings
 from models.baselines.providers import (B1ModelProvider, B3ModelProvider, 
                                         B4ModelProvider, PersonModelProvider,
                                         B5ModelProvider, B6ModelProvider, 
-                                        B7ModelProvider)
+                                        B7ModelProvider, B8ModelProvider)
 from models.baselines.BaselinesEnums import BaselinesEnums
 
 class BaselinesProviderFactory:
@@ -58,6 +58,14 @@ class BaselinesProviderFactory:
         elif provider.name == BaselinesEnums.B7_MODEL.name:
             assert base_finetuned, f"base model cannot be None for {provider.name}"
             return B7ModelProvider(
+                settings=self.settings,
+                base_finetuned=base_finetuned,
+                base_freeze=base_freeze,
+            )
+            
+        elif provider.name == BaselinesEnums.B8_MODEL.name:
+            assert base_finetuned, f"base model cannot be None for {provider.name}"
+            return B8ModelProvider(
                 settings=self.settings,
                 base_finetuned=base_finetuned,
                 base_freeze=base_freeze,

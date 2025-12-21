@@ -7,6 +7,7 @@ class TensorBoardEnums(Enum):
     B5_TENSORBOARD_DIR = "b5"
     B6_TENSORBOARD_DIR = "b6"
     B7_TENSORBOARD_DIR = "b7"
+    B8_TENSORBOARD_DIR = "b8"
     PERSON_TENSORBOARD_DIR = "person"
 
 class BaselinesEnums(Enum):
@@ -16,4 +17,5 @@ class BaselinesEnums(Enum):
     B5_MODEL = "b5_model"
     B6_MODEL = "b6_model"
     B7_MODEL = "b7_model"
+    B8_MODEL = "b8_model"
     PERSON_MODEL = "person_model"
