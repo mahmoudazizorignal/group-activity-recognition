@@ -97,7 +97,7 @@ class B8ModelProvider(BaselinesInterface):
         x = x.view(B, 2, P//2, Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, P//2, Fr, 2048 + Hi1)
         x = self.pooler(x).view(B, 2, Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, Fr, 2048 + Hi1)
         x = x.permute(0, 2, 1, 3) # (B, Fr, 2, 2048 + Hi1)
-        x = self.proj_p(x.view(B * Fr, -1)).view(B, Fr, 2048) # (B, Fr, 2048)
+        x = self.proj_p(x.reshape(B * Fr, -1)).view(B, Fr, 2048) # (B, Fr, 2048)
         
         # apply the features to lstm2
         x1, (_, _) = self.lstm(x) # (B, Fr, Hi2)
