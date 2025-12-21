@@ -133,6 +133,10 @@ class TrainerController:
                     running_loss = [lossi.item() for lossi in loss]
                     running_acc  = [acci.item() for acci in acc]
                     running_f1   = [f1i.item() for f1i in f1]
+                else:
+                    running_loss = [running_loss[i] + loss[i].item() for i in range(len(running_loss))]
+                    running_acc  = [running_acc[i] + acc[i].item() for i in range(len(running_acc))]
+                    running_f1   = [running_f1[i] + f1[i].item() for i in range(len(running_f1))]
 
                 # divide the loss by the number of gradient accumulation steps
                 loss = [lossi / self.settings.GRAD_ACCUM_STEPS for lossi in loss]
