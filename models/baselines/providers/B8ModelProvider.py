@@ -17,15 +17,17 @@ class B8ModelProvider(BaselinesInterface):
         assert hasattr(self.base, "lstm"), f"the base model {BaselinesEnums.B8_MODEL} must be temporal"
         
         # define the max pooling layer
-        self.pooler = nn.AdaptiveAvgPool3d(output_size=(
-            1,  
-            settings.FRAME_CNT,
-            settings.NO_LSTM_HIDDEN_UNITS1 + 2048
-        ))
+        self.pooler = nn.AdaptiveAvgPool3d(
+            output_size=(
+                1,  
+                settings.FRAME_CNT,
+                settings.NO_LSTM_HIDDEN_UNITS1 + 2048
+            ),
+        )
         
         # define lstm component
         self.lstm = nn.LSTM(
-            input_size=2048,
+            input_size=2 * settings.NO_LSTM_HIDDEN_UNITS1,
             hidden_size=settings.NO_LSTM_HIDDEN_UNITS2,
             num_layers=settings.NO_LSTM_LAYERS2,
             batch_first=True,
@@ -33,9 +35,8 @@ class B8ModelProvider(BaselinesInterface):
         )
         
         # define classifier component
-        self.proj_p = nn.Linear(in_features=2 * (2048 + settings.NO_LSTM_HIDDEN_UNITS1), out_features=2048)
         self.classifier = nn.Sequential(
-            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS2, out_features=1024),
+            nn.Linear(in_features=settings.NO_LSTM_HIDDEN_UNITS2, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
             nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
@@ -87,24 +88,23 @@ class B8ModelProvider(BaselinesInterface):
         x1 = x1.view(B * P, Fr, 2048)
         
         # apply the features to lstm1 
-        x2, (_, _) = self.base.lstm(x1) # (B * P, Fr, Hi1)
-        x = torch.concat([x1, x2], dim=2) # (B * P, Fr, 2048 + Hi1)
+        x1, (_, _) = self.base.lstm(x1) # (B * P, Fr, Hi1)
+        x1 = x1.view(B, P, Fr, self.settings.NO_LSTM_HIDDEN_UNITS1)
         
         # get the logits of the player activities
-        logits1 = self.base.classifier(x.view(B * P * Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1))
+        logits1 = self.base.classifier(x1.view(B * P * Fr, self.settings.NO_LSTM_HIDDEN_UNITS1))
         
         # max pooling on all players
-        x = x.view(B, 2, P//2, Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, P//2, Fr, 2048 + Hi1)
-        x = self.pooler(x).view(B, 2, Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, Fr, 2048 + Hi1)
-        x = x.permute(0, 2, 1, 3) # (B, Fr, 2, 2048 + Hi1)
-        x = self.proj_p(x.reshape(B * Fr, -1)).view(B, Fr, 2048) # (B, Fr, 2048)
+        x = x1.view(B, 2, P//2, Fr, self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, P//2, Fr, Hi1)
+        x = self.pooler(x).view(B, 2, Fr, self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, Fr, Hi1)
+        x = x.permute(0, 2, 1, 3) # (B, Fr, 2, Hi1)
+        x = x.reshape(B, Fr, 2 * self.settings.NO_LSTM_HIDDEN_UNITS1)  # (B, Fr, 2 * Hi1)
         
         # apply the features to lstm2
-        x1, (_, _) = self.lstm(x) # (B, Fr, Hi2)
-        x = torch.concat([x, x1], dim=2) # (B, Fr, 2048 + Hi2)
+        x2, (_, _) = self.lstm(x) # (B, Fr, Hi2)
         
         # get only the last hidden state of lstm2
-        x = x[:, -1, :] # (B, 2048 + Hi2)
+        x2 = x2[:, -1, :] # (B, Hi2)
         
         # apply the classifier
         logits2 = self.classifier(x)
