@@ -92,7 +92,8 @@ class B8ModelProvider(BaselinesInterface):
         x1 = x1.view(B, P, Fr, self.settings.NO_LSTM_HIDDEN_UNITS1)
         
         # get the logits of the player activities
-        logits1 = self.base.classifier(x1.view(B * P * Fr, self.settings.NO_LSTM_HIDDEN_UNITS1))
+        person_repr = x1.reshape(B * P * Fr, self.settings.NO_LSTM_HIDDEN_UNITS1)
+        logits1 = self.base.classifier(person_repr)
         
         # max pooling on all players
         x = x1.view(B, 2, P//2, Fr, self.settings.NO_LSTM_HIDDEN_UNITS1) # (B, 2, P//2, Fr, Hi1)
