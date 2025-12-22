@@ -21,7 +21,7 @@ class B8ModelProvider(BaselinesInterface):
             output_size=(
                 1,  
                 settings.FRAME_CNT,
-                settings.NO_LSTM_HIDDEN_UNITS1 + 2048
+                settings.NO_LSTM_HIDDEN_UNITS1
             ),
         )
         
