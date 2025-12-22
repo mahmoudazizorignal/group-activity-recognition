@@ -1,6 +1,7 @@
 import os
 import torch
-from typing import Tuple
+from torch import Tensor
+from typing import Tuple, Union
 from torch.utils.data import Dataset
 from helpers.config import Settings
 from abc import ABC, abstractmethod
@@ -46,5 +47,5 @@ class DatasetInterface(ABC, Dataset):
         pass
     
     @abstractmethod
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Union[Tuple[Tensor, Tensor, Tensor], Tuple[Tensor, Tensor]]:
         pass

@@ -1,5 +1,7 @@
 import os
 import torch
+from torch import Tensor
+from typing import Tuple
 from helpers.config import Settings
 from torchvision.transforms import v2
 from torchvision.io import decode_image
@@ -44,7 +46,7 @@ class GroupDatasetProvider(DatasetInterface):
         """
         return len(self.clips)
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         """
         Retrieve and preprocess a video clip and its corresponding label at the given index.
         

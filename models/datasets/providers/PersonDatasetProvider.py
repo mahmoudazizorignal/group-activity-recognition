@@ -1,5 +1,7 @@
 import os
 import torch
+from torch import Tensor
+from typing import Tuple
 from helpers.config import Settings
 from torchvision.transforms import v2
 from torchvision.io import decode_image
@@ -52,7 +54,7 @@ class PersonDatasetProvider(DatasetInterface):
         return len(self.clips)
     
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Retrieve and preprocess a video clip with all players and their corresponding labels
         at the given index.
