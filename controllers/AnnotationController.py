@@ -179,7 +179,6 @@ class AnnotationController:
             if annotations[video_no].get(clip_no, -1) == -1: 
                 annotations[video_no][clip_no] = {}
 
-            import code; code.interact(local=locals())
             annotations[video_no][clip_no] = {
                 "group_activity": target_frames[clip_no],
                 "players": self._load_tracking_annotation(
