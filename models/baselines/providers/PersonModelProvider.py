@@ -31,7 +31,7 @@ class PersonModelProvider(BaselinesInterface):
 
         # define the architecture of the classifier
         self.classifier = nn.Sequential(
-            nn.Linear(in_features=2048 + settings.NO_LSTM_HIDDEN_UNITS1 * temporal, out_features=1024),
+            nn.Linear(in_features=(1 - temporal) * 2048 + settings.NO_LSTM_HIDDEN_UNITS1 * temporal, out_features=1024),
             nn.BatchNorm1d(num_features=1024),
             nn.ReLU(),
             nn.Dropout(p=settings.HEAD_DROPOUT_RATE),
@@ -77,8 +77,7 @@ class PersonModelProvider(BaselinesInterface):
         if self.lstm:
             # apply the features to lstm         
             x2, (_, _) = self.lstm(x1) # (B * P, F, Hi1)
-            x = torch.concat([x1, x2], dim=2) # (B * P, F, 2048 + Hi1)
-            x = x.view(B * P * Fr, 2048 + self.settings.NO_LSTM_HIDDEN_UNITS1)
+            x = x2.view(B * P * Fr, self.settings.NO_LSTM_HIDDEN_UNITS1)
         else:
             # else the model is not temporal
             x = x1
