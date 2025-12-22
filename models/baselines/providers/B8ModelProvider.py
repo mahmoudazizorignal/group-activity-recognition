@@ -108,7 +108,7 @@ class B8ModelProvider(BaselinesInterface):
         x2 = x2[:, -1, :] # (B, Hi2)
         
         # apply the classifier
-        logits2 = self.classifier(x)
+        logits2 = self.classifier(x2)
         
         # calculate the cross entropy loss, accuracy, and f1-score of the batch
         logits = [logits1, logits2]
