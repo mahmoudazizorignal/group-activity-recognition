@@ -64,20 +64,40 @@ class AnnotationController:
         players = [[] for _ in range(12)]
         with open(tracking_annotation_path, "r", encoding="utf-8") as file:
             
+            frames = {}
             for line in file:
 
                 info = line.split()
 
                 if len(info) == 0 or int(info[0]) > 11: continue
-
-                players[int(info[0])].append([
+                
+                if frames.get(int(info[5]), -1) == -1:
+                    frames[int(info[5])] = []
+                    
+                frames[info[5]].append([
                     x        := int(info[1]),
                     y        := int(info[2]),
                     h        := int(info[3]) - int(info[1]),
                     w        := int(info[4]) - int(info[2]),
-                    frame_id := int(info[5]),
-                    activity := info[-1],
+                    activity := info[-1],        
                 ])
+            
+            players = [[] for _ in range(12)]
+            for frame in frames.keys():
+                
+                # sort the bounding boxes by the top left corner
+                frames[frame].sort()
+                
+                # appending the players movements through the whole clip
+                for i, bbox in enumerate(frames[frame]):
+                    players[i].append([
+                        x        := bbox[0],
+                        y        := bbox[1],
+                        h        := bbox[2],
+                        w        := bbox[3],
+                        frame_id := frame,
+                        activity := bbox[4],
+                    ])
         
         for player in players:
             player = player[9 - self.settings.CNT_BEFORE_TARGET: 9 + self.settings.CNT_AFTER_TARGET + 1]
@@ -159,6 +179,7 @@ class AnnotationController:
             if annotations[video_no].get(clip_no, -1) == -1: 
                 annotations[video_no][clip_no] = {}
 
+            import code; code.interact(local=locals())
             annotations[video_no][clip_no] = {
                 "group_activity": target_frames[clip_no],
                 "players": self._load_tracking_annotation(
