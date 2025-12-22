@@ -74,7 +74,7 @@ class AnnotationController:
                 if frames.get(int(info[5]), -1) == -1:
                     frames[int(info[5])] = []
                     
-                frames[info[5]].append([
+                frames[int(info[5])].append([
                     x        := int(info[1]),
                     y        := int(info[2]),
                     h        := int(info[3]) - int(info[1]),
