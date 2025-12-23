@@ -71,6 +71,21 @@ class B7ModelProvider(BaselinesInterface):
         self, 
         batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
+        """Forward pass for B7.
+
+        Accepts player crops and produces player and group-level outputs via
+        hierarchical temporal processing.
+
+        Parameters
+        ----------
+        batch : Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            x: (B, P, Fr, C, H, W), y1: (B, P, Fr), y2: (B, Fr)
+
+        Returns
+        -------
+        Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]
+            ([logits1, logits2], [loss1, loss2], [accs], [f1s])
+        """
         # get te input and the group annotations only
         x, y1, y2 = batch # x => (B, P, Fr, C, H, W), y1 => (B, P, Fr), y2 => (B, Fr)
         B, P, Fr, C, H, W = x.shape

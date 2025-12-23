@@ -61,6 +61,21 @@ class PersonModelProvider(BaselinesInterface):
     def forward(self, 
                 batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
+        """Forward pass for the person model.
+
+        Processes person crops (optionally through an LSTM) and returns player
+        logits and metrics.
+
+        Parameters
+        ----------
+        batch : Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            x: (B, P, Fr, C, H, W), y: (B, P, Fr), _ (unused group labels)
+
+        Returns
+        -------
+        Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]
+            ([logits], [loss], [acc], [f1])
+        """
         # get the input and the group annotations only
         x, y, _ = batch # x => (B, P, F, C, H, W), y => (B, P, F)
         B, P, Fr, C, H, W = x.shape

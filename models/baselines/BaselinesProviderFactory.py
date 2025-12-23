@@ -1,3 +1,11 @@
+"""Factory for baseline model providers.
+
+This module exposes `BaselinesProviderFactory`, a small factory that creates
+concrete baseline model provider instances (e.g., B1, B3, Person) based on a
+`BaselinesEnums` value. The created providers implement the project's
+`BaselinesInterface` and are initialized with the project's `Settings`.
+"""
+
 import torch.nn as nn
 from typing import Optional, Union
 from helpers.config import Settings
@@ -8,6 +16,12 @@ from models.baselines.providers import (B1ModelProvider, B3ModelProvider,
 from models.baselines.BaselinesEnums import BaselinesEnums
 
 class BaselinesProviderFactory:
+    """Create baseline model provider instances.
+
+    The factory centralizes construction logic for baseline models. It selects
+    the correct provider implementation based on a `BaselinesEnums` value and
+    forwards the relevant initialization parameters.
+    """
     
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -20,6 +34,26 @@ class BaselinesProviderFactory:
         base_freeze: bool = True,
         temporal: bool = True,
     ):
+        """Instantiate the provider requested by `provider`.
+
+        Parameters
+        ----------
+        provider : BaselinesEnums
+            Enum value identifying which provider to create.
+        resnet_pretrained : bool
+            Whether to initialize ResNet backbones with ImageNet weights.
+        base_finetuned : Optional[PersonModelProvider]
+            A previously fine-tuned person model used as a base where required.
+        base_freeze : bool
+            Whether a provided base model should be frozen.
+        temporal : bool
+            Whether temporal components should be enabled for person models.
+
+        Returns
+        -------
+        BaselinesInterface
+            A concrete provider instance implementing the baseline model.
+        """
         if provider.name == BaselinesEnums.B1_MODEL.name:
             return B1ModelProvider(
                 settings=self.settings,
