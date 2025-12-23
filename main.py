@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from helpers.config import get_settings
 from models.lr.LREnums import LREnums
-from models.baselines.providers import PersonModelProvider, B5ModelProvider, B6ModelProvider, B7ModelProvider
+from models.baselines.providers import PersonModelProvider, B8ModelProvider
 from models.baselines.BaselinesEnums import BaselinesEnums
 from models.datasets import DatasetProviderFactory, DatasetEnums
 from controllers import AnnotationController, TrainerController
