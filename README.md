@@ -200,11 +200,14 @@ The primary source of confusion in single-group pooling (B7) was between *l_winp
 
 ## Demo Video
 
-<!-- A short demonstration video showcasing model predictions and qualitative results can be embedded here. -->
+<p align="center">
+<video controls width="720" poster="assets/hierarchical-model-visualize.jpeg">
+    <source src="demo/video-demo.mp4" type="video/mp4">
+    Your browser does not support the HTML5 Video element. You can download the demo here: [demo/video-demo.mp4](demo/video-demo.mp4).
+</video>
+</p>
 
-<!-- **Placeholder:** Replace the following with an embedded YouTube or Vimeo link, or a path to a hosted MP4 file. -->
 
-<!-- > Demo video: *Embed demo here (YouTube/Vimeo or local path)* -->
 ## Checkpoints
 
 Large model checkpoints have been moved to a dedicated GitHub release to avoid exceeding repository LFS quotas. Download the B8 checkpoint here:
