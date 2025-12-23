@@ -200,13 +200,7 @@ The primary source of confusion in single-group pooling (B7) was between *l_winp
 
 ## Demo Video
 
-<p align="center">
-<video controls width="720" poster="assets/hierarchical-model-visualize.jpeg">
-    <source src="demo/video-demo.mp4" type="video/mp4">
-    Your browser does not support the HTML5 Video element. You can download the demo here: [demo/video-demo.mp4](demo/video-demo.mp4).
-</video>
-</p>
-
+[demo/video-demo.mp4](demo/video-demo.mp4)
 
 ## Checkpoints
 
