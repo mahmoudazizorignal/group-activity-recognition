@@ -2,75 +2,170 @@
 # Hierarchical Deep Temporal Models for Group Activity Recognition
 
 <center>
-    <img src="assets/hierarchical-model-visualize.jpeg">
+    <img src="assets/hierarchical-model-visualize.jpeg" alt="Hierarchical model visualization">
 </center>
 
+A PyTorch implementation of "Hierarchical Deep Temporal Models for Group Activity Recognition" (CVPR 2016). This repository reproduces and extends the baselines described in the paper and provides modular, well-documented model providers and training utilities for reproducible experiments.
 
-This repo is a modern implementation of CVPR16 ["Hierarchical Deep Temporal Models for Group Activity Recognition"](https://arxiv.org/pdf/1511.06040) paper using PyTorch.
+## Highlights
+
+- Modular baseline implementations (B1–B8) with a clear provider interface.
+- Support for person- and group-level models, temporal modeling via LSTMs, and TensorBoard logging.
+- Reproducible training procedure with configurable hyperparameters in `helpers.config.Settings`.
+
+## Citation
+
+If you use this repository in your research, please cite the original paper:
+
+> Mostafa S. Ibrahim, Srikanth Muralidharan, Zhiwei Deng, Arash Vahdat, Greg Mori "Hierarchical Deep Temporal Models for Group Activity Recognition", CVPR 2016.
 
 ## Requirements
 
-- Python 3.12 or later
+- Python 3.12+
+- See `requirements.txt` for exact package versions used for development and evaluation.
 
-## Install Python using MiniConda
+## Quickstart
 
-1) Download and install MiniConda from [here](https://docs.anaconda.com/free/miniconda/#quick-command-line-install).
-2) Create a new environment using the following commmand:
-```bash
-$ conda create -n activity-recognition python=3.12
-```
-3) Activate the environment:
-```bash
-$ conda activate activity-recognition
-```
-
-
-## (Optional) Setup your command line for better readability
-```bash
-$ export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
-```
-
-
-## Installation
-
-### Install the required packages
+1. Create and activate a Python environment (Miniconda recommended):
 
 ```bash
-$ pip install -r requirements.txt
+conda create -n activity-recognition python=3.12
+conda activate activity-recognition
 ```
 
-### Setup the environment variables
+2. Install dependencies:
 
 ```bash
-$ cp .env.example .env
+pip install -r requirements.txt
 ```
-Set your environment variables in the `.env` file.
 
-### Downloading the dataset
+3. Copy the environment template and set any required variables:
 
 ```bash
-$ kaggle datasets download ahmedmohamed365/volleyball -p ./data --unzip
+cp .env.example .env
+# edit .env to suit your configuration
 ```
 
-## Baselines
-We implemented all the baselines in the paper but with only one difference, the paper used AlexNet as the feature extractor, and we used ResNet-50. So, our results is expected to be better than those in the paper.
+4. Download the dataset (example via Kaggle):
 
-- B1 **Image Classification**: This baseline is the basic ResNet-50 model fine-tuned for group activity recognition in a single frame.
+```bash
+kaggle datasets download ahmedmohamed365/volleyball -p ./data --unzip
+```
 
-- B3 **Fine-tuned Person Classification**: Here, we use the ResNet-50 that fine-tuned to recognize person-level actions. Then, the final fully connected layer is pooled over all players to recognize group activities in a scene without any fine-tuning of the ResNet-50 model (we freeze it). The rationale behind this baseline is to examine a scenario where person-level action annotations as well as group activity annotations are used in a deep learning model that does not model the temporal aspect of group activities. This is very similar to the two-stage model without the temporal modeling.
+## Usage
 
-- B4 **Temporal Model with Image Features**: This baseline is a temporal extension of the B1. It examines the idea of feeding image level features directly to an LSTM model to recognize group activities. In this baseline, the ResNet-50 model is deployed on the whole image and
-resulting final fully connected layer's features are fed to an LSTM model.
+- Training is implemented via `controllers.TrainerController`. Instantiate a `TrainerController` with the desired baseline, learning-rate scheduler and DataLoaders, then call `fit()` to execute the training loop and return the best model by validation F1.
 
-- B5 **Temporal Model with Person Features**: We use ResNet-50 on the person-level actions, and the resulting final fully connected layer's are pooled over all players, and then feed to an LSTM model to recognize group-activities
+- The project stores experiment artifacts and metrics using TensorBoard when `tensorboard_track` is enabled.
 
-- B6 **Two-stage Model without LSTM 1**: This baseline is a variant of the final model, omitting the person-level temporal model (LSTM 1). Instead, the person-level classification is done only with the fine-tuned person CNN (ResNet-50).
+```python
+import torch
+from torch.utils.data import DataLoader
+from helpers.config import get_settings
+from models.lr.LREnums import LREnums
+from models.baselines.providers import PersonModelProvider, B8ModelProvider
+from models.baselines.BaselinesEnums import BaselinesEnums
+from models.datasets import DatasetProviderFactory, DatasetEnums
+from controllers import AnnotationController, TrainerController
 
-- B7 **Two-stage Model All Pooling**: We use ResNet-50 for feature extraction of the persons crops, we then pass them to the first LSTM model to do classification for the players-level actions. Then, for each frame, we max pool all the players in the scene, and we pass them to the second LSTM model to do classification for the group-level actions.
+# get the configuration set in the `.env` file
+settings = get_settings()
 
-- B8 **The Final Two-stage Model**: Same as the pervious baselines except for one trick. Instead of max pooling all the players in the scene, we first sort the bounding boxes of each player by position of the top left point to ensure that all the left team members are at the begining and the right team members are at the end. We then max pool the two groups independently from each other, and we concatenate them and pass them to the second LSTM model for group-level actions.
+# set the seed for reproducibility
+torch.manual_seed(settings.SEED)
+torch.cuda.manual_seed(settings.SEED)
+
+# process the annotations and get them
+annotator = AnnotationController(settings=settings)
+annotations = annotator.process_annotations()
+# annotator.save_annotations() # you can optionally save them so you can process them only once
+
+# prepare the datasets of the train and val
+train_dataset = DatasetProviderFactory(settings=settings, annotations=annotations).create(
+    provider=DatasetEnums.DatasetEnums.PERSON,
+    videos_split=settings.TRAIN_VIDEOS,
+)
+val_dataset = DatasetProviderFactory(settings=settings, annotations=annotations).create(
+    provider=DatasetEnums.DatasetEnums.PERSON,
+    videos_split=settings.VALIDATION_VIDEOS,
+)
+test_dataset = DatasetProviderFactory(settings=settings, annotations=annotations).create(
+    provider=DatasetEnums.DatasetEnums.PERSON,
+    videos_split=settings.TEST_VIDEOS,
+)
+
+
+# prepare the train and val loaders
+train_loader = DataLoader(
+    dataset=train_dataset,
+    batch_size=settings.MINI_BATCH,
+    shuffle=True,
+    pin_memory=bool(settings.PIN_MEMORY),
+    num_workers=settings.NUM_WORKERS_TRAIN,
+    persistent_workers=bool(settings.PERSISTANT_WORKERS),
+    drop_last=True,  # to avoid batch norm errors
+)
+val_loader = DataLoader(
+    dataset=val_dataset,
+    batch_size=settings.MINI_BATCH,
+    shuffle=False,
+    pin_memory=bool(settings.PIN_MEMORY),
+    num_workers=settings.NUM_WORKERS_EVAL,
+    persistent_workers=bool(settings.PERSISTANT_WORKERS),
+    drop_last=True,
+)
+test_loader = DataLoader(
+    dataset=test_dataset,
+    batch_size=settings.MINI_BATCH,
+    shuffle=False,
+    pin_memory=bool(settings.PIN_MEMORY),
+    num_workers=settings.NUM_WORKERS_EVAL,
+    persistent_workers=bool(settings.PERSISTANT_WORKERS),
+    drop_last=True,
+)
+
+# setup the base model
+base_model = PersonModelProvider(
+    settings=settings, 
+    resnet_pretrained=True, 
+    temporal=True, # B8 expects the base model to be temporal
+)
+
+# define our trainer
+trainer = TrainerController(
+    baseline=BaselinesEnums.B8_MODEL,
+    lr_scheduler=LREnums.COSINE,
+    settings=settings,
+    train_loader=train_loader,
+    val_loader=val_loader,
+    test_loader=test_loader,
+    resnet_pretrained=False,
+    base_finetuned=base_model,
+    base_freeze=False,
+    compile=True,
+    group_only=False,
+    tensorboard_track=True,
+)
+
+# fit the model
+model = trainer.fit()
+```
+
+## Baselines (concise)
+
+All baselines follow the original paper design but employ ResNet-50 as the image backbone (instead of AlexNet), which generally improves feature quality.
+
+- **B1 — Image classification:** Single-frame ResNet-based classifier for group action prediction.
+- **B3 — Person-based (frozen):** Uses a fine-tuned person model to extract per-player features; pools features across players to predict group actions (no temporal modeling).
+- **B4 — Image + LSTM:** Extracts image-level features per-frame and models temporal dynamics with an LSTM.
+- **B5 — Person + LSTM (hierarchical):** Uses a temporal person base to predict player actions and pools player representations to predict group actions.
+- **B6 — Two-stage (no LSTM1):** Variant that omits the person-level temporal model; person predictions are derived from the fine-tuned person CNN.
+- **B7 — Two-stage (all pooling):** Hierarchical two-stage model with player-level LSTM followed by max-pooling across players and a second LSTM at the clip level.
+- **B8 — Final two-stage (paired pooling):** Similar to B7 but pools players into left/right groups (by box ordering) before temporal fusion, reducing confusion between symmetric group actions.
 
 ## Results
+
+The table below summarizes representative results (loss / accuracy / F1) obtained with the implemented baselines.
 
 | baseline | loss    | acc      | f1       |
 |----------|---------|----------|----------|
@@ -81,22 +176,46 @@ resulting final fully connected layer's features are fed to an LSTM model.
 | b6       | 0.46214 | 0.836078 | 0.83073  |
 | b7       | 0.35916 | 0.88997  | 0.88827  |
 | b8       | 0.27161 | 0.925898 | 0.923733 |
-<br><br>
+
+Visualizations (confusion matrices) are available in `assets/`:
 
 <div style="text-align: center;">
     <figure style="display: inline-block; margin: 0;">
-        <img src="assets/confusion_matrix_b7.png" alt="Confusion Matrix">
-        <figcaption> Confusion matrix obtained using the two-stage hierarchical model (B7), using 1 group style for all players</figcaption>
-    </figure>
-</div>
-<br><br>
-<div style="text-align: center;">
-    <figure style="display: inline-block; margin: 0;">
-        <img src="assets/confusion_matrix_b8.png" alt="Confusion Matrix">
-        <figcaption> Confusion matrix obtained using the final two-stage hierarchical model (B8), using 2 groups style.</figcaption>
+        <img src="assets/confusion_matrix_b7.png" alt="Confusion Matrix B7">
+        <figcaption>Confusion matrix for B7 (single-group pooling).</figcaption>
     </figure>
 </div>
 
 <br>
 
-You can see that the model was confused between *l_winpoint* and *r_winpoint* when we pooled all the players together. But the confusion dissappeared when we used 2 group style in B8.
+<div style="text-align: center;">
+    <figure style="display: inline-block; margin: 0;">
+        <img src="assets/confusion_matrix_b8.png" alt="Confusion Matrix B8">
+        <figcaption>Confusion matrix for B8 (paired-group pooling).</figcaption>
+    </figure>
+</div>
+
+
+The primary source of confusion in single-group pooling (B7) was between *l_winpoint* and *r_winpoint*, which largely disappears after using paired pooling in B8.
+
+## Demo Video
+
+<!-- A short demonstration video showcasing model predictions and qualitative results can be embedded here. -->
+
+<!-- **Placeholder:** Replace the following with an embedded YouTube or Vimeo link, or a path to a hosted MP4 file. -->
+
+<!-- > Demo video: *Embed demo here (YouTube/Vimeo or local path)* -->
+## Checkpoints
+
+Large model checkpoints have been moved to a dedicated GitHub release to avoid exceeding repository LFS quotas. Download the B8 checkpoint here:
+
+[Download B8 checkpoint (release asset)](https://github.com/mahmoudazizorignal/group-activity-recognition/releases/download/checkpoints-b8-20251223/checkpoint-b8-0.7578744324_0.9030682743.pth)
+
+If you prefer to keep checkpoints locally for development, download the asset and place it under `checkpoints/b8/` with the same filename.
+## Contributing
+
+Contributions, issues and feature requests are welcome. Please open an issue or submit a pull request.
+
+## License
+
+This project is released under the terms of the MIT License. See `LICENSE` for details.

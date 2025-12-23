@@ -70,6 +70,21 @@ class B6ModelProvider(BaselinesInterface):
     def forward(self, 
                 batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
+        """Forward pass for B6.
+
+        Processes person crops per-frame to produce both player-level and
+        group-level predictions via pooling and LSTM-based temporal fusion.
+
+        Parameters
+        ----------
+        batch : Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            x: (B, P, Fr, C, H, W), y1: (B, P, Fr), y2: (B, Fr)
+
+        Returns
+        -------
+        Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]
+            ([logits1, logits2], [loss1, loss2], [accs], [f1s])
+        """
         # get the input and the group annotations only
         x, y1, y2 = batch # x => (B, P, Fr, C, H, W), y1 => (B, P, Fr), y2 => (B, Fr)
         B, P, Fr, C, H, W = x.shape

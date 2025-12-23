@@ -62,6 +62,22 @@ class B3ModelProvider(BaselinesInterface):
     def forward(self, 
                 batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
+        """Forward pass for B3.
+
+        Expects grouped person crops and group annotations. Uses the provided
+        person base to extract per-player features, pools across players and
+        classifies the resulting group representation.
+
+        Parameters
+        ----------
+        batch : Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            x: (B, P, Fr, C, H, W), _ (unused person labels), y: (B, Fr)
+
+        Returns
+        -------
+        Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]
+            ([logits], [loss], [acc], [f1])
+        """
         # get the input and the group annotations only
         x, _, y = batch
         

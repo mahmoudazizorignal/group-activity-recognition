@@ -51,6 +51,22 @@ class B1ModelProvider(BaselinesInterface):
     def forward(self, 
                 batch: Tuple[torch.Tensor, torch.Tensor]
         ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]:
+        """Forward pass for B1.
+
+        Expects a batch with images and per-frame annotations. The inputs are
+        reshaped to feed the ResNet backbone and the classifier. Returns a
+        single head with logits, loss, accuracy and F1.
+
+        Parameters
+        ----------
+        batch : Tuple[torch.Tensor, torch.Tensor]
+            x: (B, Fr, C, H, W), y: (B, Fr)
+
+        Returns
+        -------
+        Tuple[List[torch.Tensor], List[torch.Tensor], List[float], List[float]]
+            ([logits], [loss], [acc], [f1])
+        """
         # get the input and output of the batch and move it to the right device
         x, y = batch # x => (BATCH_SIZE, FRAME_CNT, C, H, W), y => (BATCH_SIZE, FRAME_CNT,)
         x, y = x.to(self.settings.DEVICE), y.to(self.settings.DEVICE)

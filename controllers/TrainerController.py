@@ -1,3 +1,14 @@
+"""Trainer controller for training and evaluation.
+
+This module provides the TrainerController class which encapsulates the
+training loop, evaluation routine, and TensorBoard logging for baseline
+models in the group-activity-recognition project.
+
+Classes:
+    TrainerController: Handles model training, evaluation and metrics tracking.
+
+"""
+
 import os
 import time
 import copy
@@ -16,6 +27,41 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 class TrainerController:
+    """Controller that encapsulates training and evaluation logic.
+
+    The TrainerController wraps a baseline model and provides:
+    - Training loop with gradient accumulation and optional gradient clipping.
+    - Periodic evaluation on a validation set and selection of the best model by F1 score.
+    - Optional TensorBoard logging of metrics and hyperparameters.
+    - Support for compiled models and configurable learning rate schedulers.
+
+    Parameters
+    ----------
+    baseline : BaselinesEnums
+        Identifier for the baseline model provider to create.
+    lr_scheduler : LREnums
+        Learning rate scheduler provider to use for step-based LR updates.
+    settings : Settings
+        Configuration object with all training hyperparameters and device settings.
+    train_loader, val_loader : DataLoader
+        DataLoaders for training and validation datasets.
+    test_loader : Optional[DataLoader], optional
+        DataLoader for testing (default None). If provided, evaluated at the end.
+    resnet_pretrained : bool, optional
+        Whether to initialize the backbone with pretrained weights (default True).
+    base_finetuned : Optional[PersonModelProvider], optional
+        A base model to fine-tune (default None).
+    base_freeze : bool, optional
+        Whether to freeze base model weights (default True).
+    person_temporal : bool, optional
+        Use temporal features for person stream (default True). Set it when you set `baseline` to PersonModelProvider
+    compile : bool, optional
+        Whether to call `model.compile()` when supported (default True).
+    group_only : bool, optional
+        When True, loss and metrics are computed using only the group-level outputs.
+    tensorboard_track : bool, optional
+        Enable TensorBoard tracking (default True).
+    """
     
     def __init__(
         self, 
@@ -82,6 +128,21 @@ class TrainerController:
 
     
     def eval_model(self, eval_loader: DataLoader) -> tuple[List[float], List[float], List[float]]:
+        """Evaluate the model on a DataLoader.
+
+        Runs the model in inference mode over `eval_loader` and returns averaged
+        loss, accuracy and F1 score lists (one value per output head).
+
+        Parameters
+        ----------
+        eval_loader : DataLoader
+            DataLoader to evaluate on.
+
+        Returns
+        -------
+        tuple[List[float], List[float], List[float]]
+            Averaged (loss, accuracy, f1) across the dataset.
+        """
 
         # set the model to evaluation mode
         self.model.eval()
@@ -112,6 +173,18 @@ class TrainerController:
         return running_loss, running_acc, running_f1
 
     def fit(self) -> nn.Module:
+        """Run the full training loop and return the best model.
+
+        Training supports gradient accumulation, learning rate scheduling,
+        periodic evaluation on the validation set, and optional test set
+        evaluation. If `tensorboard_track` is enabled, training metrics and
+        hyper-parameters are written to TensorBoard.
+
+        Returns
+        -------
+        nn.Module
+            The best-performing model (copied to CPU) determined by validation F1.
+        """
 
         # set the model to the training mode
         self.model.train()
