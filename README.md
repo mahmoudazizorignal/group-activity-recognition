@@ -202,7 +202,13 @@ The primary source of confusion in single-group pooling (B7) was between *l_winp
 <!-- **Placeholder:** Replace the following with an embedded YouTube or Vimeo link, or a path to a hosted MP4 file. -->
 
 <!-- > Demo video: *Embed demo here (YouTube/Vimeo or local path)* -->
+## Checkpoints
 
+Large model checkpoints have been moved to a dedicated GitHub release to avoid exceeding repository LFS quotas. Download the B8 checkpoint here:
+
+[Download B8 checkpoint (release asset)](https://github.com/mahmoudazizorignal/group-activity-recognition/releases/download/checkpoints-b8-20251223/checkpoint-b8-0.7578744324_0.9030682743.pth)
+
+If you prefer to keep checkpoints locally for development, download the asset and place it under `checkpoints/b8/` with the same filename.
 ## Contributing
 
 Contributions, issues and feature requests are welcome. Please open an issue or submit a pull request.
