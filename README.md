@@ -81,19 +81,19 @@ resulting final fully connected layer's features are fed to an LSTM model.
 | b6       | 0.46214 | 0.836078 | 0.83073  |
 | b7       | 0.35916 | 0.88997  | 0.88827  |
 | b8       | 0.27161 | 0.925898 | 0.923733 |
-
+<br><br>
 
 <div style="text-align: center;">
     <figure style="display: inline-block; margin: 0;">
         <img src="assets/confusion_matrix_b7.png" alt="Confusion Matrix">
-        <figcaption> Confusion matrix for the Volleyball Dataset obtained using the two-stage hierarchical model (B7), using 1 group style for all players</figcaption>
+        <figcaption> Confusion matrix obtained using the two-stage hierarchical model (B7), using 1 group style for all players</figcaption>
     </figure>
 </div>
-
+<br><br>
 <div style="text-align: center;">
     <figure style="display: inline-block; margin: 0;">
         <img src="assets/confusion_matrix_b8.png" alt="Confusion Matrix">
-        <figcaption> Confusion matrix for the Volleyball Dataset obtained using the final two-stage hierarchical model (B8), using 2 groups style.</figcaption>
+        <figcaption> Confusion matrix obtained using the final two-stage hierarchical model (B8), using 2 groups style.</figcaption>
     </figure>
 </div>
 
