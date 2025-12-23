@@ -125,7 +125,7 @@ class PersonDatasetProvider(DatasetInterface):
             # else, get a specified number of frames before and after along with the corresponding labels
             x.append([])
             y1.append([])
-            frames = player[10 - self.no_frames_before: 10 + self.no_frames_after + 1]
+            frames = player[9 - self.no_frames_before: 9 + self.no_frames_after + 1]
             for frame in frames:
                 
                 # retrieve bouding box details
