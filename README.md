@@ -146,6 +146,9 @@ trainer = TrainerController(
     group_only=False,
     tensorboard_track=True,
 )
+
+# fit the model
+model = trainer.fit()
 ```
 
 ## Baselines (concise)
